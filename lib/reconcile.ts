@@ -13,6 +13,7 @@ import { logDecision } from "./log";
 
 const MINUTE = 60_000;
 const STALE_RECRUITMENT_MS = 10 * MINUTE;
+const RETRY_RECRUITMENT_MS = 15 * MINUTE;
 const UNRECRUITED_GRACE_MS = 2 * MINUTE; // first read's after() may still be running
 const UNPROCESSED_EVENT_GRACE_MS = 2 * MINUTE; // the webhook's own after() may still be running
 const LOW_CREDITS_DOLLARS = 18; // one three-reviewer order
@@ -58,7 +59,9 @@ export async function reconcile(): Promise<Summary> {
       if (!job) {
         if (since > UNRECRUITED_GRACE_MS) s.recruited.push({ orderId: o.id, ...(await recruitOrder(o.id)) });
       } else if (job.state === "retryable") {
-        s.recruited.push({ orderId: o.id, ...(await recruitOrder(o.id)) });
+        // Retry at most every 15 minutes: each failed attempt (for example, no credits) logs a decision row.
+        if (Date.now() - Date.parse(job.updated_at) > RETRY_RECRUITMENT_MS) s.recruited.push({ orderId: o.id, ...(await recruitOrder(o.id)) });
+        else await flag({ orderId: o.id, step: "recruitment", choice: "waiting_retry", reason: `Recruitment will be retried: ${job.last_error ?? "unknown error"}` });
       } else if (["creating", "preparing", "launching"].includes(job.state) && Date.now() - Date.parse(job.updated_at) > STALE_RECRUITMENT_MS) {
         await flag({ orderId: o.id, step: "recruitment", choice: "stuck", reason: `Recruitment job has been '${job.state}' since ${job.updated_at}${job.opportunity_id ? ` (opportunity ${job.opportunity_id})` : " with no opportunity ID"}; inspect Terac drafts named second-look:${o.id} before retrying` });
       } else if (job.state === "needs_attention") {

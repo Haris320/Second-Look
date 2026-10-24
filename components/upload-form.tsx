@@ -429,8 +429,9 @@ export function UploadForm({ initialTier = "quick", initialAudience = "women_21_
               </p>
               <label className="field-label" htmlFor="package">Choose your review</label>
               <select id="package" value={tier} onChange={e => setTier(e.target.value as Tier)}>
-                <option value="quick">One reviewer — $15</option>
-                <option value="full">Three reviewers — $40</option>
+                {(Object.keys(TIERS) as Tier[]).map(key => (
+                  <option key={key} value={key}>{TIERS[key].name} — ${TIERS[key].priceUsd}</option>
+                ))}
               </select>
               <p className="field-help">Both include up to 10 screenshots and feedback on photos and prompts. One payment, no subscription.</p>
               <div className="consents">
