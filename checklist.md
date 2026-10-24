@@ -66,6 +66,8 @@ Written once by partner's code, read by `/order/[id]`. Photos are referred to by
 - **Privacy:** screenshots are deleted **right after the report is delivered**, not after 7 days. Page wording: "Your screenshots are deleted as soon as your report is delivered."
 - **Whop:** production by default; sandbox only when `WHOP_ENVIRONMENT=sandbox`. If we buy our own product to test, refund it afterwards, and ask the organizers whether team purchases count toward revenue.
 - **Submission:** public repo, deployment, 2-minute video, Whop Business ID (details in the new CLAUDE.md/plan.md).
+- **Pricing (supersedes the CLAUDE.md table):** one offer, **$15 for 3 reviews** (`REVIEW_OFFER` in `lib/tiers.ts`, stored as tier `quick`). Checkout is created per order from `/order`; the webhook only accepts $15 payments.
+- **Marketplace:** no Whop store products yet. Listing waits until a marketplace purchase can be linked to an order securely (email alone isn't proof of payment, so `/api/orders/claim` is disabled).
 
 ---
 
