@@ -4,15 +4,19 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { ReferralLoginError, safeProviderCode, safeValidationDetail, type ReferralLoginCode } from "./referral-login-errors";
 
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+// WHOP_CLIENT_SECRET is optional. With it, the Whop app is a confidential client and the secret is sent at the
+// token endpoint (its API key needs the oauth:token_exchange permission). Without it, the app must be a public
+// client and the exchange relies on PKCE alone; the whitelisted redirect URI, state, nonce, and id_token
+// verification still bind every code to this server.
 export function referralLoginReady() {
-  return Boolean(process.env.WHOP_CLIENT_ID && process.env.WHOP_CLIENT_SECRET &&
+  return Boolean(process.env.WHOP_CLIENT_ID &&
     process.env.PUBLIC_BASE_URL && (process.env.REFERRAL_SESSION_SECRET?.length ?? 0)>=32);
 }
 function config() {
   if (!referralLoginReady()) throw new Error("Whop sign-in is not configured");
   const origin = new URL(process.env.PUBLIC_BASE_URL!).origin;
   return {
-    clientId:process.env.WHOP_CLIENT_ID!,secret:process.env.WHOP_CLIENT_SECRET!,
+    clientId:process.env.WHOP_CLIENT_ID!,secret:process.env.WHOP_CLIENT_SECRET || null,
     base:process.env.WHOP_ENVIRONMENT === "sandbox" ? "https://sandbox-api.whop.com" : "https://api.whop.com",
     callback:`${origin}/api/referrals/callback`,
   };
@@ -48,7 +52,7 @@ async function providerJson(url:string,stage:ReferralLoginCode,init:RequestInit=
 export async function exchangeReferralIdentity(code:string,pending:ReturnType<typeof newReferralLogin>) {
   const c=config();
   const tokens=await providerJson(`${c.base}/oauth/token`,"token_exchange",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-    client_id:c.clientId,client_secret:c.secret,grant_type:"authorization_code",redirect_uri:c.callback,code,code_verifier:pending.verifier,
+    client_id:c.clientId,...(c.secret ? {client_secret:c.secret} : {}),grant_type:"authorization_code",redirect_uri:c.callback,code,code_verifier:pending.verifier,
   })});
   if (typeof tokens.access_token !== "string" || typeof tokens.id_token !== "string" || (typeof tokens.token_type !== "string" || tokens.token_type.toLowerCase() !== "bearer")) throw new ReferralLoginError("token_response");
   const discovery=await providerJson(`${c.base}/.well-known/openid-configuration`,"discovery");

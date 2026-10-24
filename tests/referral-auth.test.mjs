@@ -65,6 +65,12 @@ test('verified server-side identity must match both the signed ID token and user
  const body=JSON.parse(requests[0].init.body);assert.equal(body.code_verifier,pending.verifier);assert.equal(body.client_secret,'test-oauth-secret');assert.equal(requests[2].init.headers.Authorization,'Bearer server-only-token');
  user.sub='user_B';await assert.rejects(oauth.exchangeReferralIdentity('code',pending),error=>error.code==='identity');
 });
+test('without WHOP_CLIENT_SECRET the app is a public client: PKCE only, no client_secret sent, still ready',async()=>{
+ reset();delete process.env.WHOP_CLIENT_SECRET;assert.equal(oauth.referralLoginReady(),true);
+ const pending=oauth.newReferralLogin(scope);token=await jwt(pending);
+ assert.deepEqual(await oauth.exchangeReferralIdentity('code',pending),{userId:'user_A',email:'a@test.com',label:'person-a'});
+ const body=JSON.parse(requests[0].init.body);assert.equal(body.code_verifier,pending.verifier);assert.equal('client_secret' in body,false);assert.equal(body.client_id,'app_test');
+});
 test('wrong nonce, invalid signature, and wrong audience cannot authenticate',async()=>{
  reset();const pending=oauth.newReferralLogin(scope);token=await jwt(pending,{nonce:'wrong'});await assert.rejects(oauth.exchangeReferralIdentity('code',pending),error=>error.code==='nonce');
  const otherKeys=await generateKeyPair('RS256');token=await jwt(pending,{},otherKeys.privateKey);await assert.rejects(oauth.exchangeReferralIdentity('code',pending));

@@ -24,7 +24,7 @@ For local testing, register `http://localhost:3000/api/referrals/callback` on yo
 Add these server-only Vercel variables:
 
 - `WHOP_CLIENT_ID`: OAuth client ID from the app, usually `app_…`.
-- `WHOP_CLIENT_SECRET`: OAuth client secret, not your business `WHOP_API_KEY`.
+- `WHOP_CLIENT_SECRET`: optional. The app's API key, used only when the app's OAuth client type is `confidential`; that key must have the `oauth:token_exchange` permission or Whop answers `401 invalid_client: client_secret lacks oauth:token_exchange permission`. Leave it unset and set the app's OAuth client type to `public` to rely on PKCE alone (the current production setup). Not your business `WHOP_API_KEY`.
 - `REFERRAL_SESSION_SECRET`: separate random value of at least 32 characters (`openssl rand -hex 32`). Keep it stable; rotation logs referrers out.
 
 Keep `PUBLIC_BASE_URL=https://second-look-beta.vercel.app` and `WHOP_ENVIRONMENT=production` for production. For sandbox, use sandbox OAuth credentials and `WHOP_ENVIRONMENT=sandbox`, matching the payment configuration. Redeploy after setting variables.
