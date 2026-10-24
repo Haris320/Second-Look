@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import sharp from "sharp";
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { db } from "./supabase";
 import { logDecision } from "./log";
@@ -61,6 +62,21 @@ Speak to the customer as "you". Be kind but honest. Comment on choices they cont
 
 const anthropic = new Anthropic();
 
+// Big phone screenshots can break the image limits, so each one is shrunk to at most 1568px on its longest side
+// (smaller ones keep their size) and sent as JPEG.
+const MAX_SIDE = 1568;
+async function shrink(url: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`screenshot download returned ${res.status}`);
+  const jpeg = await sharp(Buffer.from(await res.arrayBuffer()), { limitInputPixels: 40_000_000 })
+    .rotate()
+    .resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  return jpeg.toString("base64");
+}
+
 // Reads the order's screenshots with Claude. No database writes, so it is safe to try on any order.
 // `missing` = the customer needs to upload again; `failure` = the check itself broke.
 export async function readProfile(
@@ -81,12 +97,13 @@ export async function readProfile(
   if (error || !signed) return { failure: "Could not sign the screenshot URLs" };
   const urls = signed.map((s) => s.signedUrl);
   if (urls.some((url) => !url)) return { missing: "Some screenshot files are missing from storage" };
-  const content: Anthropic.ContentBlockParam[] = shots.flatMap((s, i) => [
-    { type: "text" as const, text: `Screenshot ${s.position}` },
-    { type: "image" as const, source: { type: "url" as const, url: urls[i]! } },
-  ]);
-  content.push({ type: "text", text: "Run the safety check, then give the first read." });
   try {
+    const images = await Promise.all(urls.map((url) => shrink(url!)));
+    const content: Anthropic.ContentBlockParam[] = shots.flatMap((s, i) => [
+      { type: "text" as const, text: `Screenshot ${s.position}` },
+      { type: "image" as const, source: { type: "base64" as const, media_type: "image/jpeg" as const, data: images[i] } },
+    ]);
+    content.push({ type: "text", text: "Run the safety check, then give the first read." });
     const response = await anthropic.messages.parse({
       model: "claude-opus-5-5",
       max_tokens: 16000,
