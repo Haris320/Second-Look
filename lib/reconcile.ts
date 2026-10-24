@@ -4,6 +4,7 @@ import { withTerac } from "./terac";
 import { recruitOrder } from "./recruitment";
 import { assertOpportunityMatches, opportunityInput } from "./recruitment-policy";
 import { processFeedback, processFeedbackEvent } from "./feedback-quality";
+import { FEEDBACK_POLICY_VERSION } from "./feedback-policy";
 import { deliverReportIfComplete, deleteScreenshots } from "./report";
 import { logDecision } from "./log";
 
@@ -114,7 +115,7 @@ export async function reconcile(): Promise<Summary> {
   const { data: reviews } = live.length
     ? await db.from("reviews").select("id,order_id,terac_submission_id,status,submitted_at,created_at").in("order_id", live.map(o => o.id))
     : { data: [] as { id: string; order_id: string; terac_submission_id: string; status: string; submitted_at: string | null; created_at: string }[] };
-  const { data: fjobs } = await db.from("feedback_quality_jobs").select("submission_id,state,lease_until,last_error");
+  const { data: fjobs } = await db.from("feedback_quality_jobs").select("submission_id,state,lease_until,last_error,policy_version,decision");
   const fjobBySubmission = new Map((fjobs ?? []).map(j => [j.submission_id, j]));
   const candidates = new Set<string>();
   if (live.length) {
@@ -168,6 +169,19 @@ export async function reconcile(): Promise<Summary> {
   for (const id of candidates) {
     const fj = fjobBySubmission.get(id);
     if (fj?.state === "done") continue;
+    // A hold decided under an older policy version is re-graded under the current one (the saved assessment
+    // stays for audit). Holds made under the current policy, and all other states, are only surfaced.
+    if (fj?.state === "needs_attention" && fj.policy_version && fj.policy_version !== FEEDBACK_POLICY_VERSION && fj.decision?.outcome === "needs_attention") {
+      const orderId = (reviews ?? []).find(r => r.terac_submission_id === id)?.order_id ?? null;
+      const { data: reopened } = await db.from("feedback_quality_jobs").update({ state: "retry", decision: null, input_hash: null, last_error: null, updated_at: new Date().toISOString() })
+        .eq("submission_id", id).eq("state", "needs_attention").eq("policy_version", fj.policy_version).select("submission_id");
+      if (reopened?.length) {
+        await logDecision(orderId, "review_quality", "reopened", `Hold was decided under ${fj.policy_version}; grading again under ${FEEDBACK_POLICY_VERSION}`);
+        try { s.feedback.push({ submissionId: id, ...(await processFeedback(id)) }); }
+        catch (e) { s.errors.push(`feedback ${id}: ${message(e)}`); }
+      }
+      continue;
+    }
     if (fj?.state === "needs_attention") {
       const orderId = (reviews ?? []).find(r => r.terac_submission_id === id)?.order_id ?? null;
       await flag({ orderId, step: "review_quality", choice: "still_held", reason: `Submission ${id} is held for a human: ${fj.last_error ?? "see feedback_quality_jobs"}` });
