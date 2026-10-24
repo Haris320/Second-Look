@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
-import { AUDIENCES, validateFiles, type UploadManifest } from "@/lib/uploads";
+import { validateFiles, type UploadManifest } from "@/lib/uploads";
+import { reviewerPreferenceError } from "@/lib/audience";
 import { REVIEW_OFFER } from "@/lib/tiers";
 import { grantAccess, sameOrigin, privateHeaders } from "@/lib/order-access";
 
@@ -21,7 +22,25 @@ export async function POST(request: Request) {
   }
   if (!body || typeof body !== "object" || Array.isArray(body))
     return Response.json({ error: "Invalid request." }, { status: 400 });
-  const { email, audience, ownProfile, adult, files } = body;
+  const {
+    email,
+    userAge,
+    reviewerGender,
+    reviewerMinAge,
+    reviewerMaxAge,
+    ownProfile,
+    adult,
+    files,
+  } = body;
+  const preferenceError = reviewerPreferenceError({
+    userAge,
+    reviewerGender,
+    reviewerMinAge,
+    reviewerMaxAge,
+  });
+  if (preferenceError)
+    return Response.json({ error: preferenceError }, { status: 400 });
+  const audience = `${reviewerGender}_${reviewerMinAge}_${reviewerMaxAge}_us`;
   const error = validateFiles(files);
   if (error) return Response.json({ error }, { status: 400 });
   if (
@@ -33,11 +52,7 @@ export async function POST(request: Request) {
       { error: "Enter a valid email address." },
       { status: 400 },
     );
-  if (
-    !Object.hasOwn(AUDIENCES, audience) ||
-    ownProfile !== true ||
-    adult !== true
-  )
+  if (ownProfile !== true || adult !== true)
     return Response.json(
       { error: "Choose your review details and confirm both checkboxes." },
       { status: 400 },
@@ -89,7 +104,12 @@ export async function POST(request: Request) {
       if (signError || !data) throw signError;
       uploads.push({ path: row.storage_path, token: data.token });
     }
-    await logDecision(id, "order", "created", "Standard $15 order with 3 reviewers; awaiting payment");
+    await logDecision(
+      id,
+      "order",
+      "created",
+      "Standard $15 order with 3 reviewers; awaiting payment",
+    );
     await grantAccess(id);
     return Response.json(
       { orderId: id, uploads, storageUrl: process.env.SUPABASE_URL },

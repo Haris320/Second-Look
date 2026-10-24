@@ -7,7 +7,10 @@
 ```json
 {
   "email": "customer@example.com",
-  "audience": "women_21_35_us",
+  "userAge": 28,
+  "reviewerGender": "women",
+  "reviewerMinAge": 21,
+  "reviewerMaxAge": 35,
   "ownProfile": true,
   "adult": true,
   "files": [{ "name": "profile.png", "type": "image/png", "size": 123456 }]
@@ -73,3 +76,9 @@ The paid service is commercial usage; verify the hosting plan is eligible under 
 ## Merge compatibility
 
 The payment webhook retains the team’s `notifyOrderPaid` hook, and Whop checkout retains `isSalesOpen`/`setSalesOpen`. Superseded upload/finalize endpoints return 410; verified marketplace claiming remains unavailable rather than exposing paid orders using an email alone. Screenshot positions are one-based to match the agent handoff contract.
+
+## Reviewer preferences
+
+The customer enters their age, chooses male or female reviewers, and can edit minimum and maximum reviewer ages. Defaults are `max(18, userAge - 7)` through `min(120, userAge + 7)`. All ages must be integers in 18–120, and minimum cannot exceed maximum. Changing the customer age resets the recommendation; a separate reset button restores it after manual edits.
+
+The server derives `orders.audience` as `<women|men>_<min>_<max>_us` (for example `men_33_47_us`), preserving the existing schema. Customer age is used for the recommendation and validation but is not persisted. The agent must parse these dynamic age bounds and recruit matching reviewers; the original two fixed 21–35 panels are insufficient for custom ranges. Never silently widen the requested range.

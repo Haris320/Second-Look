@@ -2704,3 +2704,22 @@ h2 em {
     font-size: 44px;
   }
 }
+input[type="number"] {
+  width: 100%;
+  border: 1px solid #d9ded0;
+  border-radius: 3px;
+  background: #fff;
+  padding: 12px 14px;
+  color: var(--ink);
+  font-size: 12px;
+  outline-offset: 2px;
+}
+.reviewer-age-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.age-reset {
+  font-size: 11px;
+  margin-top: 12px;
+}

@@ -134,7 +134,7 @@ export default function Home() {
           {[
             [
               "Who’s looking at my profile?",
-              "Human reviewers recruited through Terac. You can choose women or men aged 21–35 in the United States. You’ll get several individual opinions, not one person speaking for everyone.",
+              "Human reviewers recruited through Terac. You can choose male or female reviewers in the United States and set their age range. The default is within 7 years of your age, with an 18+ minimum. You’ll get several individual opinions, not one person speaking for everyone.",
             ],
             [
               "What should I upload?",

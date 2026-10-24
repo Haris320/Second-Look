@@ -14,13 +14,13 @@ import {
   Trash2,
   AlertCircle,
 } from "lucide-react";
-import { AUDIENCES, type Audience } from "@/lib/uploads";
+import { audienceLabel } from "@/lib/audience";
 import { TIERS, type Tier } from "@/lib/tiers";
 import { ReportContent, type ProfileReport } from "./report-content";
 type OrderData = {
   order: {
     id: string;
-    audience: Audience;
+    audience: string;
     tier: Tier;
     amount_cents: number | null;
     review_target: number;
@@ -262,7 +262,7 @@ export function OrderStatus({ id }: { id: string }) {
             </div>
             <div>
               <dt>Audience</dt>
-              <dd>{AUDIENCES[order.audience] ?? order.audience}</dd>
+              <dd>{audienceLabel(order.audience)}</dd>
             </div>
             <div>
               <dt>Screenshots</dt>
