@@ -44,7 +44,7 @@ export async function createCheckout(orderId: string, tier: Tier) {
     account_id: whopBizId,
     plan: {
       title: name,
-      description: `${reviews} real-person reviews of your dating profile`,
+      description: `${reviews} real-person reviews of your dating profile, results by tonight`,
       initial_price: priceUsd,
       currency: "usd",
       plan_type: "one_time",

@@ -104,7 +104,7 @@ Context for an agent picking this up. No secret values appear here; keys live on
 ## Where things stand right now
 
 - **The real $15 payment test passed** (2026-10-24, 15:57–15:58 UTC). Upload → production Whop checkout → real payment → signed webhook → payment re-fetched → order marked `paid` → decisions logged. The webhook marked it paid within about a second.
-- **The test order is still in the database on purpose. The refund is on hold; Haris will refund later.**
+- **The test order stays on purpose: no refund, no delete.** It will be our first real end-to-end test with Terac reviewers.
 
   | Field | Value |
   |---|---|
@@ -116,23 +116,20 @@ Context for an agent picking this up. No secret values appear here; keys live on
   | Reviews | 0 of 3 |
   | Audience | `men_18_31_us` (made by the old age-range form; not a valid audience any more) |
   | Screenshots | 1 file in bucket `screenshots`, path in `screenshots.storage_path` for that order |
-  | Decisions | 2 rows: `order/created`, `payment/paid` |
+  | Decisions | 2 rows: `order/created`, `payment/paid`. (The three orphaned `order/created` rows with no order ID were deleted.) |
 
-- **This test order must not reach Terac reviewers.**
-  - Its audience matches no panel, so panel matching shouldn't pick it up.
-  - When the partner's agent starts processing `paid` orders, make sure it skips this order, or clean it up first.
-  - The order counts toward any revenue the dashboard shows until it's removed.
-- **When Haris says the refund is done:** delete the order's storage file, then its `screenshots` rows, then its `decisions` rows, then the order itself. Ask Haris to confirm before deleting. Never refund anything yourself.
+- **This order should reach Terac reviewers** once Terac is live. Its audience matches no panel, so it needs moving to `women_21_35_us` or `men_21_35_us` first; Haris will confirm which with the partner.
+- Terac is down for about 2 hours (per the hosts). The partner is building the Terac side in mock mode, so going live only needs the key.
 - **Everything is pushed**; the last commits on `main` are the two-audience change and this handoff. The live site has the two-audience form.
 
 ## Next action items
 
 **Haris (Whop and customer side)**
-1. ~~Run the real $15 test~~ (passed). Later: refund `pay_J1xEzBcJINCx6i` in the Whop dashboard, then have the agent delete the test order (above).
+1. ~~Run the real $15 test~~ (passed). Keep that order for the first Terac end-to-end test (above).
 2. **Whop dashboard:**
    - confirm payouts and verification are finished so live payments settle (ask Whop staff);
    - set the store name and URL name, logo, banner and support email.
-3. Design secure purchase linking for marketplace buyers before listing any store product. Use whop-docs to see what Whop appends to a product's post-purchase redirect (receipt, membership or payment ID) that the server can verify.
+3. Marketplace is parked as "later" (see checklist.md). Haris is asking Whop staff whether it should be a Whop app instead.
 4. Ask the organizers whether purchases by our own team count toward revenue.
 
 **Partner (Terac)**

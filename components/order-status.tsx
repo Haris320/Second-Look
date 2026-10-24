@@ -180,9 +180,11 @@ export function OrderStatus({ id }: { id: string }) {
                 : `${savedCount} of ${screenshots.length} screenshots saved`}
           </h2>
           <p>
-            {paid
+            {done
               ? "Every perspective comes from an independent human reviewer."
-              : "You haven’t been charged. Review your details before heading to Whop."}
+              : paid
+                ? "Every perspective comes from an independent human reviewer. Your results arrive by tonight."
+                : "You haven’t been charged. Review your details before heading to Whop."}
           </p>
           <ol className="status-timeline">
             {[

@@ -68,7 +68,9 @@ Written once by partner's code, read by `/order/[id]`. Photos are referred to by
 - **Submission:** public repo, deployment, 2-minute video, Whop Business ID (details in the new CLAUDE.md/plan.md).
 - **Pricing (supersedes the CLAUDE.md table):** one offer, **$15 for 3 reviews** (`REVIEW_OFFER` in `lib/tiers.ts`, stored as tier `quick`). Checkout is created per order from `/order`; the webhook only accepts $15 payments.
 - **Audiences:** customers choose one of exactly two: **"Women, 21–35, US"** (`women_21_35_us`) or **"Men, 21–35, US"** (`men_21_35_us`). No custom age ranges. The list lives in `AUDIENCES` in `lib/tiers.ts`, and each key matches one of the two Terac panels. `/api/orders` rejects anything else.
-- **Marketplace:** no Whop store products yet. Listing waits until a marketplace purchase can be linked to an order securely (email alone isn't proof of payment, so `/api/orders/claim` is disabled).
+- **Marketplace: later.** Parked. No Whop store products until a marketplace purchase can be linked to an order securely (email alone isn't proof of payment, so `/api/orders/claim` stays disabled). Haris is asking Whop staff whether this should be a Whop app instead, which might solve linking. Don't design or build it until that answer is in.
+- **Delivery promise:** "Results by tonight" everywhere (landing, order form, order page, Whop checkout description) while Terac is down. Tighten it once Terac is live and we know real turnaround.
+- **Test order `b5a2985e…`:** kept on purpose (no refund, no delete). It will be the first real end-to-end test with Terac reviewers. Its audience is `men_18_31_us` from the old age-range form, so it matches no panel until it's moved to a valid audience.
 
 ---
 

@@ -225,7 +225,7 @@ export function UploadForm() {
           <p>
             {step === 1
               ? "Add your photos and prompts in the order they appear on your dating profile."
-              : "Choose your reviewers and tell us where to send your results."}
+              : "Choose your reviewers and tell us where to send your results. Results by tonight."}
           </p>
         </div>
         {step === 1 ? (

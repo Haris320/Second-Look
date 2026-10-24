@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { REVIEW_OFFER } from "@/lib/tiers";
+import { ReportContent, type AgentReport } from "@/components/report-content";
+
+// Paste a real delivered report_json here (with the customer's permission) to show the sample section.
+// Leave it null until then: we never show made-up numbers as a real result.
+const SAMPLE_REPORT: AgentReport | null = null;
 
 export default function Home() {
   return (
@@ -21,7 +26,9 @@ export default function Home() {
               Get my profile reviewed <ArrowRight size={17} />
             </Link>
           </div>
-          <p className="editorial-small">$15 · 3 reviewers · No subscription</p>
+          <p className="editorial-small">
+            $15 · 3 reviewers · Results by tonight
+          </p>
         </div>
         <aside className="review-note">
           <div className="note-heading">
@@ -67,19 +74,28 @@ export default function Home() {
           <span className="section-number">01 / THE PROCESS</span>
           <h2>Here’s how it works.</h2>
         </div>
-        <div className="plain-steps">
+        <div
+          className="plain-steps"
+          style={{
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          }}
+        >
           {[
             [
-              "Send your profile",
-              "Upload up to 10 screenshots, including your photos and prompt answers. Put them in the same order as your profile.",
+              "Upload your profile",
+              "Add up to 10 screenshots of your photos and prompt answers, in the same order as your profile.",
             ],
             [
-              "Choose who takes a look",
-              "Pick your reviewer audience and pay through Whop. Each person gives their own feedback independently.",
+              "Choose who reviews it",
+              "Pick women or men aged 21–35 in the US, then pay $15 once through Whop.",
             ],
             [
-              "Decide what to change",
-              "Read their feedback and the suggested changes. Keep the advice that feels useful. It’s still your profile.",
+              "Real people review it",
+              "Three reviewers each rate your photos, react to your prompts, and suggest one change, independently.",
+            ],
+            [
+              "Get your report by tonight",
+              "See what's working, which photo to lead with, and the top fixes to make. Keep what feels useful.",
             ],
           ].map(([title, text], i) => (
             <article key={title}>
@@ -90,6 +106,19 @@ export default function Home() {
           ))}
         </div>
       </section>
+      {SAMPLE_REPORT && (
+        <section className="wrap editorial-section" id="sample-report">
+          <div className="editorial-section-heading">
+            <span className="section-number">A REAL RESULT</span>
+            <h2>What a report looks like.</h2>
+            <p>
+              Shared with permission. Every number and quote comes from real
+              reviewers.
+            </p>
+          </div>
+          <ReportContent report={SAMPLE_REPORT} />
+        </section>
+      )}
       <section className="wrap editorial-section" id="pricing">
         <div className="editorial-section-heading">
           <span className="section-number">02 / PICK A REVIEW</span>
@@ -135,6 +164,10 @@ export default function Home() {
             [
               "Who’s looking at my profile?",
               "Human reviewers recruited through Terac. You choose women or men aged 21–35 in the United States. You’ll get several individual opinions, not one person speaking for everyone.",
+            ],
+            [
+              "How fast will I get my results?",
+              "By tonight. Reviewers pick up orders as they come in, and your order page updates as each review arrives.",
             ],
             [
               "What should I upload?",
