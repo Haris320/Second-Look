@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "./supabase";
 import { withTerac } from "./terac";
 import { recruitOrder } from "./recruitment";
+import { assertOpportunityMatches, opportunityInput } from "./recruitment-policy";
 import { processFeedback, processFeedbackEvent } from "./feedback-quality";
 import { deliverReportIfComplete, deleteScreenshots } from "./report";
 import { logDecision } from "./log";
@@ -14,6 +15,7 @@ import { logDecision } from "./log";
 const MINUTE = 60_000;
 const STALE_RECRUITMENT_MS = 10 * MINUTE;
 const RETRY_RECRUITMENT_MS = 15 * MINUTE;
+const LATE_DRAFT_WAIT_MS = 6 * MINUTE; // longest Terac create seen today was under five minutes
 const UNRECRUITED_GRACE_MS = 2 * MINUTE; // first read's after() may still be running
 const UNPROCESSED_EVENT_GRACE_MS = 2 * MINUTE; // the webhook's own after() may still be running
 const LOW_CREDITS_DOLLARS = 18; // one three-reviewer order
@@ -26,6 +28,37 @@ type Summary = {
 };
 
 function message(e: unknown) { return (e instanceof Error ? e.message : String(e)).slice(0, 200); }
+
+// A create that timed out may still have produced a draft. Find it by this order's private task URL and adopt
+// it (recruitOrder then launches it), or, when Terac has nothing for this order, clear the job and recruit again.
+async function recoverLostCreate(orderId: string, taskToken: string) {
+  const projectId = process.env.TERAC_PROJECT_ID;
+  const baseUrl = process.env.PUBLIC_BASE_URL;
+  if (!projectId || !baseUrl) throw new Error("Recruitment configuration incomplete");
+  const { data: order, error } = await db.from("orders").select("status,audience,review_target").eq("id", orderId).single();
+  if (error || !order || order.status !== "paid") throw new Error("Order is no longer waiting for recruitment");
+  const input = opportunityInput(orderId, order.audience, projectId, baseUrl, taskToken, order.review_target);
+  const late = await withTerac(async call => {
+    const page = await call<unknown>("terac_list_opportunities", { projectId, limit: 50 });
+    for (const item of listItems<{ id?: string; internal_title?: string; status?: string }>(page)) {
+      if (item?.internal_title !== input.internal_title || typeof item.id !== "string") continue;
+      const candidate = await call<Record<string, unknown>>("terac_get_opportunity", { opportunityId: item.id });
+      try { assertOpportunityMatches(candidate, input); return candidate as { id: string; status: string }; } catch { /* a different draft for this order, e.g. an older token */ }
+    }
+    return null;
+  });
+  if (late) {
+    const { error: linkError } = await db.from("recruitment_jobs").update({ opportunity_id: late.id, state: "retryable", last_error: null, updated_at: new Date().toISOString() })
+      .eq("order_id", orderId).eq("state", "needs_attention").is("opportunity_id", null);
+    if (linkError) throw new Error("Could not adopt the late draft");
+    await logDecision(orderId, "recruitment", "reconciled", `Create had timed out but Terac has ${late.status} opportunity ${late.id} for this order; adopted it instead of creating another`);
+  } else {
+    const { error: resetError } = await db.from("recruitment_jobs").delete().eq("order_id", orderId).eq("state", "needs_attention").is("opportunity_id", null);
+    if (resetError) throw new Error("Could not reset the blocked recruitment job");
+    await logDecision(orderId, "recruitment", "reset", "Create had timed out and Terac has no opportunity for this order; recruiting again from scratch");
+  }
+  return recruitOrder(orderId);
+}
 function listItems<T>(page: unknown): T[] {
   if (Array.isArray(page)) return page as T[];
   const found = Object.values((page ?? {}) as Record<string, unknown>).find(Array.isArray);
@@ -48,7 +81,7 @@ export async function reconcile(): Promise<Summary> {
 
   const { data: orders, error: ordersError } = await db.from("orders").select("id,status,review_target,reviews_done,created_at,paid_at").in("status", ["paid", "in_review", "done"]).order("created_at");
   if (ordersError || !orders) throw new Error("Could not load orders");
-  const { data: jobs } = await db.from("recruitment_jobs").select("order_id,state,opportunity_id,updated_at,last_error");
+  const { data: jobs } = await db.from("recruitment_jobs").select("order_id,state,opportunity_id,updated_at,last_error,task_token");
   const jobByOrder = new Map((jobs ?? []).map(j => [j.order_id, j]));
 
   // 1. Recruitment: paid orders that never got a job, retryable jobs, and stuck or blocked jobs.
@@ -64,6 +97,10 @@ export async function reconcile(): Promise<Summary> {
         else await flag({ orderId: o.id, step: "recruitment", choice: "waiting_retry", reason: `Recruitment will be retried: ${job.last_error ?? "unknown error"}` });
       } else if (["creating", "preparing", "launching"].includes(job.state) && Date.now() - Date.parse(job.updated_at) > STALE_RECRUITMENT_MS) {
         await flag({ orderId: o.id, step: "recruitment", choice: "stuck", reason: `Recruitment job has been '${job.state}' since ${job.updated_at}${job.opportunity_id ? ` (opportunity ${job.opportunity_id})` : " with no opportunity ID"}; inspect Terac drafts named second-look:${o.id} before retrying` });
+      } else if (job.state === "needs_attention" && !job.opportunity_id) {
+        // The create call timed out (Terac creates have taken up to five minutes). Wait, then either adopt the late
+        // draft Terac made for this order or, if there is none, recruit again from scratch. Never both.
+        if (Date.now() - Date.parse(job.updated_at) > LATE_DRAFT_WAIT_MS) s.recruited.push({ orderId: o.id, ...(await recoverLostCreate(o.id, job.task_token)) });
       } else if (job.state === "needs_attention") {
         await flag({ orderId: o.id, step: "recruitment", choice: "blocked", reason: `Recruitment needs a human: ${job.last_error ?? "unknown error"}` });
       }

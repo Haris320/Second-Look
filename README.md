@@ -1,49 +1,81 @@
 # Second Look
 
-Real people review your dating profile. One standard review costs $15 and includes 3 independent reviewers. Built with React, TypeScript, Next.js App Router, and private Supabase Storage.
+Real people review your dating profile and tell you what's working, what isn't, and what to change. Built for the Zero-Human Company hackathon (Terac, at Whop HQ): no one on the team touches an order.
+
+- **Live:** https://second-look-beta.vercel.app
+- **Whop business:** `biz_TTHTUhhUiv6lMQ`
+- **Price:** $15 for one reviewer, $40 for three (`lib/tiers.ts`). Up to 10 screenshots. Works with screenshots from Hinge, Bumble, Tinder, or any app; we're independent of all of them.
+
+## What it does
+
+1. The customer uploads screenshots of their own profile, picks who should review it (women or men, 21–35, US), and pays on Whop.
+2. Claude checks the screenshots are a dating profile with nothing explicit and no minor, and gives the customer an instant AI first read.
+3. The server recruits real reviewers through the **Terac MCP**: one Terac opportunity per order, filtered to the chosen audience, with a dating-app screener and manual review of each submission.
+4. Reviewers open our `/review` page from Terac, see the screenshots, and answer: would you like this profile, what works, what to change, how to improve the prompts.
+5. Claude grades each review for completeness, grounding, actionability and respect, then **approves** (Terac pays the reviewer) or **rejects** it through the MCP. Rejected reviews don't count and the slot is freed.
+6. When the order has its approved reviews, Claude summarizes them into a report (only reviewer text; the summary is labeled as AI), the customer is messaged on Whop, and the screenshots are deleted.
+7. Every step writes one row to `decisions` with a one-line reason; `/dashboard` shows it live.
+
+## How it works
+
+One Next.js 16 app (App Router, Cache Components) on Vercel. Supabase Postgres and a private storage bucket. Claude via the Anthropic API. Terac via its MCP server. Whop via `@whop/sdk`.
+
+| Path | Role |
+|---|---|
+| `app/page.tsx`, `app/order`, `app/order/[id]`, `app/example` | Landing, upload and checkout, private order status and report, illustrative example |
+| `app/review` + `app/api/review` | Reviewer task opened from Terac; assigns a slot, shows signed screenshot URLs, saves answers, redirects to Terac's completion callback |
+| `app/api/whop/webhook` | Verified `payment.succeeded` → order `screening` → `lib/first-read.ts` → `paid` / `needs_reupload` / `held`; "payment received" Whop message (`lib/notify.ts`); then `lib/recruitment.ts` |
+| `lib/recruitment.ts`, `lib/recruitment-policy.ts` | Creates and launches the per-order Terac opportunity through the MCP, with a per-order cost cap and reconciliation of lost responses |
+| `app/api/terac/webhook` + `lib/feedback-quality.ts` | Signed Terac events; on `awaiting_review` Claude grades the saved answers and approves/rejects via MCP (`lib/feedback-assessment.ts`, `lib/feedback-policy.ts`, `lib/feedback-actions.ts`) |
+| `lib/report.ts` | Builds `report_json` from approved reviews, marks `done`, sends the results message, deletes screenshots |
+| `lib/reconcile.ts` + `app/api/agent/reconcile` | Safety net for every stall path (below) |
+| `app/dashboard` + `app/api/dashboard` | Password-protected revenue, orders, median paid→report time, live decision log |
+| `supabase/schema.sql`, `supabase/migrations/*.sql` | Tables: `orders`, `screenshots`, `reviews`, `decisions`, `recruitment_jobs`, `feedback_quality_jobs`, `terac_webhook_events`, referrals |
+
+Order status: `pending_payment → screening → paid → in_review → done` (plus `needs_reupload` and `held`). `reviews_done` counts approved reviews only. Every report's `review_ids` map to real Terac submissions.
+
+### Recovery
+
+Terac webhooks are the fast path. `POST /api/agent/reconcile` (header `Authorization: Bearer $CRON_SECRET`) is the path that always works: it retries recruitment for paid orders, polls Terac for finished submissions the webhook missed and grades them, retries interrupted quality checks, frees slots whose reviewer abandoned, re-processes unprocessed webhook events, delivers complete reports, deletes leftover screenshots, and logs `credits/low` when the Terac balance can't cover another order. It never launches anything outside the normal paid-order flow and never moves money.
+
+Run it every few minutes from a laptop while Vercel Hobby crons only run daily:
+
+```bash
+node --env-file=.env.local scripts/reconcile-loop.mjs 3
+```
+
+Other protected routes: `POST /api/agent/order-paid {orderId}` (retry one order's recruitment), `POST /api/agent/review-feedback {submissionId}` (re-run one quality check), `POST /api/agent/deliver-reports` (deliver every complete order).
 
 ## Run locally
 
-Use Node.js 22.13+ or a current supported LTS version.
+Node 22+.
 
 ```bash
 npm ci
-cp .env.example .env.local  # Only for a new checkout; do not overwrite existing credentials.
+cp .env.example .env.local   # fill in values; never commit them
 npm run dev
 ```
 
-Open http://localhost:3000. Required upload settings:
+Environment (names only; see `.env.example`): `ANTHROPIC_API_KEY`, `TERAC_API_KEY`, `TERAC_PROJECT_ID`, `TERAC_WEBHOOK_SECRET`, `TERAC_RECRUITMENT_ENABLED`, `TERAC_MAX_ORDER_COST_CENTS`, `FEEDBACK_REVIEW_ENABLED`, `WHOP_ENVIRONMENT`, `WHOP_API_KEY`, `WHOP_BIZ_ID`, `WHOP_WEBHOOK_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `PUBLIC_BASE_URL`, `DASHBOARD_PASSWORD`, `CRON_SECRET`, `ORDER_LINK_SECRET`, `ORDER_SESSION_SECRET`. Only `NEXT_PUBLIC_*` reach the browser.
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_KEY` — server secret or legacy service-role key; never exposed to the browser
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — browser-safe key
+Apply `supabase/schema.sql` once, then each file in `supabase/migrations/` in date order, in the Supabase SQL editor. Create a private `screenshots` bucket (10 MB limit, PNG/JPEG/WebP).
 
-The existing database schema is in `supabase/schema.sql`. Do not rerun it against an already configured project. Storage requires a private `screenshots` bucket with a 10 MB file limit and support for PNG, JPEG, and WebP.
-
-## What works
-
-- Responsive landing page, pricing, FAQ, and clearly labeled illustrative report.
-- `/order`: select or drop 1–10 screenshots; preview, reorder, and remove them; select audience; enter email and adult/profile-owner consent.
-- Uploads go directly to private Supabase Storage using server-issued upload tokens. The server writes `orders` and `screenshots` rows and verifies actual image bytes before checkout.
-- `/order/[id]`: protected order status, screenshots, payment handoff, and deletion of an unpaid draft without an active checkout. Access uses an HttpOnly cookie in the browser that created the order.
-- `/dashboard`: password-protected live data for the latest 100 orders and 25 decisions. Set `DASHBOARD_PASSWORD` to enable sign-in.
-- `/review`: interactive UI preview only; live assignment and submission integration belongs to the Terac backend.
-- `/start`: a truthful placeholder until verified Whop purchase claiming is implemented. It does not unlock purchases by email alone.
-
-## Integration status
-
-Whop checkout uses the existing `lib/whop.ts` helper when the selected environment's API key, business ID, and `PUBLIC_BASE_URL` are set. The existing `/api/whop/webhook` remains unchanged. Live payments have not been exercised by the frontend upload tests.
-
-Terac assignment, review processing, report generation, email notification, and automatic screenshot deletion after delivery are not implemented by this frontend change. The site does not claim these operations have completed. Keep live sales closed until fulfillment is verified end to end.
-
-See `docs/frontend-integration.md` for route contracts and deployment details.
+Point a Whop webhook (`payment.succeeded`) at `/api/whop/webhook` and a Terac webhook subscription (`submission.status.change`) at `/api/terac/webhook`.
 
 ## Checks
 
 ```bash
 npm run lint
 npm run build
+node --test tests/*.test.mjs   # mocked MCP + PGlite; recruits and pays nobody
 ```
 
-The upload integration was also exercised against Supabase with 10 synthetic images, invalid file/count requests, session isolation, private object access, and cleanup of all test objects and orders. Browser visual verification was unavailable because local browser access was declined.
+## Rules the code keeps
+
+- Every review in a report is a real, approved Terac submission. Claude summarizes; it never invents reviews or scores.
+- Own profile only, adults only (required checkboxes); reviewers filtered to 21–35.
+- Screenshots live in a private bucket, are shown to reviewers only through signed short-lived URLs, and are deleted as soon as the report is delivered.
+- The agent never refunds or moves money. Held orders are refunded by a human in the Whop dashboard.
+- Every automated decision is logged to `decisions`.
+
+More detail: `checklist.md` (decisions and the order lifecycle), `docs/handoff.md` (current state), `docs/terac-recruitment.md`, `docs/feedback-quality.md`, `docs/terac-webhook.md`.
