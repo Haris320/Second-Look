@@ -24,8 +24,7 @@ if (process.argv.includes("--claude")) {
   const response = await client.beta.messages.create({
     model: "claude-opus-5-5",
     max_tokens: 16000,
-    betas: ["mcp-client-2025-11-20", "server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+    betas: ["mcp-client-2025-11-20"],
     mcp_servers: [{ type: "url", url: TERAC_MCP_URL, name: "terac", authorization_token: token }],
     tools: [{ type: "mcp_toolset", mcp_server_name: "terac" }],
     messages: [{ role: "user", content: "Call terac_get_context and report our organization name and balance in one line." }],

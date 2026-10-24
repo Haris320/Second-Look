@@ -8,13 +8,14 @@ create extension if not exists pgcrypto;
 create table orders (
   id              uuid primary key default gen_random_uuid(),
   email           text not null,
-  audience        text not null,                       -- e.g. women_21_35_us
+  audience        text,                                -- e.g. women_21_35_us; null until a Flow B buyer uploads
   tier            text not null check (tier in ('quick', 'full', 'rush')),
   review_target   int  not null,
   reviews_done    int  not null default 0,
   -- awaiting_upload: paid on the Whop marketplace (Flow B), screenshots not uploaded yet
   status          text not null default 'pending_payment'
                   check (status in ('pending_payment', 'awaiting_upload', 'paid', 'in_review', 'done')),
+  whop_checkout_id text,
   whop_payment_id text unique,
   amount_cents    int,
   report_json     jsonb,
