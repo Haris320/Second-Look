@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./supabase";
-import { withTerac } from "./terac";
+import { withTerac, type TeracCall } from "./terac";
 import { assertRecruitable, opportunityInput, assertLaunchable, assertOpportunityMatches, type Opportunity } from "./recruitment-policy";
 import { logDecision } from "./log";
 
@@ -8,6 +8,27 @@ type Job = { order_id: string; state: string; opportunity_id: string | null; tas
 async function saveJob(orderId: string, update: Record<string, unknown>) {
   const { error } = await db.from("recruitment_jobs").update({ ...update, updated_at: new Date().toISOString() }).eq("order_id", orderId);
   if (error) throw new Error("Could not save recruitment state");
+}
+
+// Terac sometimes finishes creating a draft after our create call has timed out. Find that draft by this
+// order's private task URL (assertOpportunityMatches) instead of giving up or paying for a second one.
+async function findLateDraft(call: TeracCall, projectId: string, input: ReturnType<typeof opportunityInput>) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 15_000));
+    const page = await call<unknown>("terac_list_opportunities", { projectId, status: "draft", limit: 25 });
+    const items = (Array.isArray(page) ? page : Object.values(page ?? {}).find(Array.isArray) ?? []) as { id?: string }[];
+    for (const item of items) {
+      if (typeof item?.id !== "string") continue;
+      const candidate = await call<Opportunity>("terac_get_opportunity", { opportunityId: item.id });
+      try {
+        assertOpportunityMatches(candidate, input);
+        return candidate;
+      } catch {
+        // Another order's draft.
+      }
+    }
+  }
+  return null;
 }
 
 export async function recruitOrder(orderId: string) {
@@ -33,7 +54,14 @@ export async function recruitOrder(orderId: string) {
       let opportunity: Opportunity;
       if (!job.opportunity_id) {
         phase = "creating";
-        opportunity = await call<Opportunity>("terac_create_opportunity", input);
+        try {
+          opportunity = await call<Opportunity>("terac_create_opportunity", input, 90_000);
+        } catch (createError) {
+          const late = await findLateDraft(call, projectId, input);
+          if (!late) throw createError;
+          opportunity = late;
+          await logDecision(orderId, "recruitment", "reconciled", `Create call failed but Terac created draft ${late.id} for this order; adopting it instead of creating another`);
+        }
         if (!opportunity.id) throw new Error("Terac returned no opportunity ID");
         job.opportunity_id = opportunity.id;
         await saveJob(orderId, { opportunity_id: opportunity.id, state: "preparing" });

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
+import { after } from "next/server";
 import sharp from "sharp";
 import { db } from "./supabase";
 import { withTerac } from "./terac";
@@ -8,6 +9,7 @@ import { decideFeedback, FEEDBACK_POLICY_VERSION, type FeedbackDecision } from "
 import { applyFeedbackDecision, assertSubmission, type Submission } from "./feedback-actions";
 import { parseReviewAnswers } from "./reviewer-access";
 import { logDecision } from "./log";
+import { deliverReportIfComplete } from "./report";
 
 type QualityJob = { state: string; attempts: number; decision: FeedbackDecision | null; input_hash: string | null };
 export async function processFeedback(submissionId: string) {
@@ -75,6 +77,8 @@ export async function processFeedback(submissionId: string) {
       await applyFeedbackDecision(call,submissionId,recruitment.opportunity_id,review.terac_participant_id,decision);
       const { error: finishError } = await db.rpc("finish_feedback_quality", { p_submission: submissionId, p_token: token, p_outcome: decision.outcome });
       if (finishError) throw new Error("Could not finalize confirmed feedback decision");
+      // The approval that completes the order triggers its report; Terac's webhook gets its reply first.
+      if (decision.outcome === "approved") after(() => deliverReportIfComplete(review.order_id));
       return { state: "done", outcome: decision.outcome };
     });
   } catch {
