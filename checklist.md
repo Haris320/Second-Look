@@ -19,10 +19,28 @@ Only edit files you own. Shared files need a heads-up to the other person before
 
 ### Handoff between the two halves
 
-- **Order status:** Haris's code creates orders (`pending_payment`, or `awaiting_upload` for marketplace buyers) and the Whop webhook sets them to **`paid`**. Partner's code takes it from there: `paid → in_review` (first reviewer assigned) → **`done`**. On `done` it writes `report_json` and `delivered_at`, then deletes the order's screenshots (storage files and `screenshots` rows).
+- **Order status:** Haris's code creates orders (`pending_payment`, or `awaiting_upload` for marketplace buyers). The Whop webhook sets them to `screening`, and the AI first read (`lib/first-read.ts`) moves them to **`paid`** or `held`. Partner's code only ever picks up `paid` orders and takes it from there: `paid → in_review` (first reviewer assigned) → **`done`**. On `done` it writes `report_json` and `delivered_at`, then deletes the order's screenshots (storage files and `screenshots` rows).
 - **Review progress:** partner's code keeps `reviews_done` current (approved reviews only). `/order/[id]` shows `reviews_done` of `review_target`, then renders `report_json` once `status = 'done'`.
 - **Resuming panels when an order is paid** (agreed): after marking an order `paid`, the webhook calls `POST /api/agent/order-paid` with body `{ "orderId": "<uuid>" }` and header `Authorization: Bearer $CRON_SECRET`, inside `after()` so Whop gets its 200 first. **Partner owns that route**; it checks the secret and calls `onOrderPaid(orderId)` from `lib/agent.ts`. Until the route exists the call gets a 404 and does nothing; partner's tick also resumes panels whenever it finds `paid` orders. (It's a route rather than a direct import because Turbopack fails the build on an import of a file that isn't merged yet.) Flow B orders reach `paid` when the buyer uploads on `/start`, which calls the same route.
 - **Pausing sales:** partner's agent calls `setSalesOpen(false)` from `lib/whop.ts` when Terac credits can't cover the open orders, and `setSalesOpen(true)` when they can. Closing hides our Whop products and makes `createCheckout` throw "Sales are paused"; `isSalesOpen()` tells the order page to show a "back soon" message. Each call is logged to `decisions` by the caller.
+
+### The zero-human loop, end to end
+
+Every paid order runs through these steps with no one on the team touching it. Each step logs one `decisions` row (step/choice in brackets; the partner's are suggested names), which `/dashboard` shows live.
+
+| # | Step | Owner | Status |
+|---|---|---|---|
+| 1 | Customer uploads and pays on a per-order Whop checkout. The webhook verifies the signature, re-fetches the payment, and marks the order `screening` [`payment/paid`] | Haris | Live (marks `paid` until step 2 deploys) |
+| 2 | **AI first read:** Claude checks the screenshots are a dating profile, with nothing explicit and no minor. Pass → `paid`, instant feedback on `/order/[id]` labeled as AI [`first_read/passed`]. Fail, or the check itself fails → `held`, reason in `hold_reason`, no reviewer sees it [`first_read/held`] | Haris | Built; waits on the schema SQL, then deploy |
+| 3 | Hand the passed order to the agent: `POST /api/agent/order-paid` → `onOrderPaid(orderId)` | Haris calls it, partner owns the route | Partner (mock mode) |
+| 4 | **Route to the right panel:** `orders.audience` (`women_21_35_us` / `men_21_35_us`) picks the Terac panel; the reviewer page assigns the oldest `paid` order for its audience, `paid → in_review` [`review/assigned`] | Partner | Partner (mock mode) |
+| 5 | **Panels on and off:** resume a panel when paid orders wait for its audience, pause it when none do [`panel/resumed`, `panel/paused`] | Partner | Partner (mock mode) |
+| 6 | Reviewer submits; answers saved; redirect to the Terac callback | Partner | Partner (mock mode) |
+| 7 | **Quality check:** Claude approves (Terac pays the reviewer) or rejects (no pay; the order gets another reviewer) each submission; `reviews_done` counts approved only [`review/approved`, `review/rejected`] | Partner | Partner (mock mode) |
+| 8 | **Credits:** after each approval, check the Terac balance. If it can't cover open orders, call `setSalesOpen(false)`, which hides Whop products and blocks new checkouts; call `setSalesOpen(true)` when it can [`sales/paused`, `sales/opened`] | Partner calls it; Haris built `setSalesOpen` | `setSalesOpen` tested in sandbox; the call is partner's |
+| 9 | **Report:** at `review_target`, Claude builds `report_json` from approved reviews only (AI rewrites labeled); status `done`, `delivered_at` set [`report/delivered`] | Partner writes it, Haris's page renders it | Page live; writer is partner's |
+| 10 | **Delete screenshots:** storage files and `screenshots` rows, right after delivery [`privacy/deleted`] | Partner | Partner (mock mode) |
+| 11 | Held orders: refund in the Whop dashboard. The agent never moves money, so this is the one human step, and only for orders that fail the check | Haris (human) | Manual by design |
 
 ### Proposed `report_json` shape (agree before building)
 
