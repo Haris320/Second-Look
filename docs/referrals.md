@@ -14,7 +14,7 @@ Vercel Hobby permits daily cron jobs; this schedule is once per day at roughly n
 
 ## Rules and privacy
 
-- Only verified paid Whop buyers become referrers. There is no public endpoint to choose a recipient or change a payout destination.
+- A Whop account is required to earn referral rewards. Only verified paid Whop buyers become referrers. There is no public endpoint to choose a recipient or change a payout destination.
 - The destination is the referrer's verified Whop user ID. Rewards go to their Whop balance; withdrawal availability is controlled by Whop.
 - The last valid referral link visited before order creation wins. A later visit cannot replace the order's saved attribution. Cookies last 30 days; no cross-device attribution without reopening the link. Private browsing or blocked cookies may prevent attribution.
 - Marketplace purchases made directly on Whop cannot inherit this website cookie. Friends must use the website referral link and checkout. Marketplace buyers can become referrers after their payment is verified.
