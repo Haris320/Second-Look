@@ -5,6 +5,56 @@ Each step has a **Check** that proves it works. Don't start the next step on the
 
 Verified on 2026-10-24 against live docs / endpoints (details at the bottom). Anything marked **(unverified)** must be confirmed before code depends on it.
 
+## Ownership (2026-10-24)
+
+Only edit files you own. Shared files need a heads-up to the other person before any change.
+
+| Owner | Files |
+|---|---|
+| **Haris: Whop + customer side** | `lib/whop.ts`, `lib/tiers.ts`, `app/api/whop/*`, `app/api/orders/*`, pages `/`, `/order`, `/start`, `/order/[id]`, the Vercel deployment |
+| **Partner: Terac + agent** | `scripts/terac-*`, `lib/terac*`, `lib/agent*`, `lib/report*`, `app/api/review/*`, `app/api/agent/*`, page `/review` |
+| **Shared (heads-up first)** | `lib/supabase.ts`, `lib/log.ts`, `supabase/schema.sql` |
+
+### Handoff between the two halves
+
+- **Order status:** Haris's code creates orders (`pending_payment`, or `awaiting_upload` for marketplace buyers) and the Whop webhook sets them to **`paid`**. Partner's code takes it from there: `paid → in_review` (first reviewer assigned) → **`done`**. On `done` it writes `report_json` and `delivered_at`, then deletes the order's screenshots (storage files and `screenshots` rows).
+- **Review progress:** partner's code keeps `reviews_done` current (approved reviews only). `/order/[id]` shows `reviews_done` of `review_target`, then renders `report_json` once `status = 'done'`.
+- **Resuming panels when an order is paid** (proposal): the webhook calls `onOrderPaid(orderId)` exported from `lib/agent.ts` (partner implements it) inside `after()`, so the webhook still answers Whop immediately. Until that exists, partner's tick can resume panels whenever it finds `paid` orders.
+- **Pausing sales:** partner's agent calls `setSalesOpen(false)` from `lib/whop.ts` when Terac credits can't cover the open orders, and `setSalesOpen(true)` when they can. Closing hides our Whop products and makes `createCheckout` throw "Sales are paused"; `isSalesOpen()` tells the order page to show a "back soon" message. Each call is logged to `decisions` by the caller.
+
+### Proposed `report_json` shape (agree before building)
+
+Written once by partner's code, read by `/order/[id]`. Photos are referred to by `screenshots.position` (1-based), because the images are deleted on delivery. Every number and quote comes from approved reviews; only `ai_rewrites` is AI-written, and the page labels it that way.
+
+```json
+{
+  "version": 1,
+  "generated_at": "2026-10-24T18:00:00Z",
+  "review_count": 5,
+  "like": { "yes": 3, "maybe": 1, "no": 1 },
+  "photos": [
+    { "position": 1, "avg_score": 7.4, "best_votes": 2, "worst_votes": 0 },
+    { "position": 2, "avg_score": 5.1, "best_votes": 0, "worst_votes": 3 }
+  ],
+  "lead_photo": 1,
+  "cut_photo": 2,
+  "prompts": {
+    "works":      { "summary": "The travel prompt feels specific and fun.", "quotes": ["The Lisbon story made me smile"] },
+    "falls_flat": { "summary": "The 'simple pleasures' answer is generic.", "quotes": ["Everyone says coffee and dogs"] }
+  },
+  "come_across": [ { "word": "funny", "count": 3 }, { "word": "adventurous", "count": 2 } ],
+  "top_fixes": [
+    { "fix": "Lead with the beach photo instead of the group shot", "mentions": 3 },
+    { "fix": "Replace the sunglasses selfie", "mentions": 2 },
+    { "fix": "Make the 'simple pleasures' answer more specific", "mentions": 2 }
+  ],
+  "ai_rewrites": [ { "prompt": "My simple pleasures", "rewrite": "Finding the one bakery in every city that still sells day-old bread for a dollar" } ],
+  "review_ids": ["<reviews.id>", "<reviews.id>"]
+}
+```
+
+`ai_rewrites` is an empty array for tiers without prompt rewrites. `review_ids` ties every report back to real Terac submissions (golden rule 2).
+
 ## Decisions (team, 2026-10-24)
 
 - **Terac callback:** `https://terac.com/api/external/callback?teracSubmissionId={id}&result=completed`. Other `result` values: `screened_out`, `quota_full`, `rejected`. A reviewer who arrives to an empty queue is sent back with `result=quota_full`.

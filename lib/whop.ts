@@ -15,8 +15,30 @@ export const whop = new WhopClient({
   environment: sandbox ? WhopEnvironment.Sandbox : WhopEnvironment.Production,
 });
 
+// The agent calls this when Terac credits run low (false) or are topped up (true).
+// Closing hides every visible product and tags it, so reopening only restores what we hid.
+// The tag also stops createCheckout, which uses inline plans that no product listing controls.
+export async function setSalesOpen(open: boolean) {
+  for await (const product of await whop.products.list({ account_id: whopBizId })) {
+    const paused = product.metadata?.sales_paused === true;
+    if (!open && product.visibility === "visible") {
+      await whop.products.update({ id: product.id, visibility: "hidden", metadata: { ...product.metadata, sales_paused: true } });
+    } else if (open && paused) {
+      await whop.products.update({ id: product.id, visibility: "visible", metadata: { ...product.metadata, sales_paused: false } });
+    }
+  }
+}
+
+export async function isSalesOpen() {
+  for await (const product of await whop.products.list({ account_id: whopBizId })) {
+    if (product.metadata?.sales_paused === true) return false;
+  }
+  return true;
+}
+
 // Flow A: one checkout per order. The order ID rides along in metadata, which Whop copies onto the payment.
 export async function createCheckout(orderId: string, tier: Tier) {
+  if (!(await isSalesOpen())) throw new Error("Sales are paused");
   const { name, reviews, priceUsd } = TIERS[tier];
   const config = await whop.checkoutConfigurations.create({
     account_id: whopBizId,
