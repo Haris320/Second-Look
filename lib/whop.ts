@@ -15,7 +15,8 @@ export const whop = new WhopClient({
   environment: sandbox ? WhopEnvironment.Sandbox : WhopEnvironment.Production,
 });
 
-// The agent calls this when Terac credits run low (false) or are topped up (true).
+// Emergency switch only: there is no automatic sales cap (we top up Terac credits instead). Use it to stop
+// taking orders by hand, e.g. if Terac goes down for good.
 // Closing hides every visible product and tags it, so reopening only restores what we hid.
 // The tag also stops createCheckout, which uses inline plans that no product listing controls.
 export async function setSalesOpen(open: boolean) {

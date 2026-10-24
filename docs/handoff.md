@@ -121,7 +121,12 @@ Context for an agent picking this up. No secret values appear here; keys live on
 - **This order should reach Terac reviewers** once Terac is live. Its audience matches no panel, so it needs moving to `women_21_35_us` or `men_21_35_us` first; Haris will confirm which with the partner.
 - Terac is down for about 2 hours (per the hosts). The partner is building the Terac side in mock mode, so going live only needs the key.
 - Its only screenshot isn't a dating profile (the AI first read describes an AR room-scanning app over a desk). Reviewers would be rating a desk photo, so swap in real profile screenshots before the Terac run.
-- **AI first read** (`lib/first-read.ts`): built and committed, **not deployed**. It needs `supabase/migrations/2026-10-24-first-read.sql` run first, because the webhook now sets `screening` and the order API reads `first_read_json`. Push only after that SQL has run. The full loop and its owners are in checklist.md, "The zero-human loop, end to end".
+- **AI first read (`lib/first-read.ts`): deployed and live.** `supabase/migrations/2026-10-24-first-read.sql` has been run (statuses `screening`, `needs_reupload`, `held`; columns `first_read_json`, `hold_reason`).
+  - Paid orders go `screening` → `paid`, `needs_reupload` (not a dating profile or screenshots missing; the customer re-uploads on `/order/[id]`) or `held` (explicit, looks under 18, or the check errored twice; Haris refunds).
+  - Screenshots are shrunk to 1568px before the call.
+  - Live checks passed: unsigned and forged webhooks get 401; the order page loads; the order API returns `first_read_json`.
+  - The full loop and its owners are in checklist.md, "The zero-human loop, end to end".
+- **Sales cap:** none. We top up Terac credits; `setSalesOpen` is an emergency switch only.
 - **Everything is pushed**; the last commits on `main` are the two-audience change and this handoff. The live site has the two-audience form.
 
 ## Next action items
