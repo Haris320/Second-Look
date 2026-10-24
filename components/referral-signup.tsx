@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { referralLoginMessage } from "@/lib/referral-login-errors";
 import { ReferralPanel, type ReferralSummary } from "./referral-panel";
 type Account={ready:boolean;referral:ReferralSummary|null;accountLabel?:string};
 export function ReferralSignup() {
@@ -15,11 +16,13 @@ export function ReferralSignup() {
     } catch(e) {setError(e instanceof Error ? e.message : "Please try again.");}
   },[]);
   useEffect(()=>{
-    const result=new URLSearchParams(window.location.search).get("error");
+    const params=new URLSearchParams(window.location.search);
+    const result=params.get("error");
+    const reference=params.get("ref");
     // OAuth errors are mapped to fixed messages, never reflected from provider query parameters.
     if(result) {
       window.history.replaceState(null,"","/refer");
-      queueMicrotask(()=>setLoginError(result==="canceled" ? "Sign-in was canceled. You can try again whenever you’re ready." : "We couldn’t complete Whop sign-in. Please try again."));
+      queueMicrotask(()=>setLoginError(`${referralLoginMessage(result)}${reference && /^[0-9a-f-]{36}$/.test(reference) ? ` Reference: ${reference}` : ""}`));
     }
     void Promise.resolve().then(load);
   },[load]);

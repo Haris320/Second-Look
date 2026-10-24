@@ -10,14 +10,16 @@ const compile=(path,replacements={})=>{
  return url(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 };
 const keys=await generateKeyPair('RS256');
-let jar=new Map(),scope='production:biz',token,user,requests=[],identityCalls=0,upserts=[];
+let jar=new Map(),scope='production:biz',token,user,requests=[],identityCalls=0,upserts=[],loginLogs=[],providerFailure=null,dbError=null;
 const cookieStore={get:k=>jar.get(k),set:(k,value,options)=>jar.set(k,{value,options})};
 globalThis.__oauthTest={jwtVerify,publicKey:keys.publicKey,cookies:async()=>cookieStore};
-const oauth=await import(compile('../lib/whop-oauth.ts',{jose:url('export const jwtVerify=globalThis.__oauthTest.jwtVerify;export const createRemoteJWKSet=()=>globalThis.__oauthTest.publicKey;')}));
+const errorsUrl=compile('../lib/referral-login-errors.ts');
+const oauth=await import(compile('../lib/whop-oauth.ts',{'./referral-login-errors':errorsUrl,jose:url('export const jwtVerify=globalThis.__oauthTest.jwtVerify;export const createRemoteJWKSet=()=>globalThis.__oauthTest.publicKey;')}));
 const originalFetch=globalThis.fetch;
 test.after(()=>{globalThis.fetch=originalFetch;});
 globalThis.fetch=async(endpoint,init)=>{
  requests.push({endpoint,init});
+ if(providerFailure && endpoint.endsWith('/oauth/token'))return Response.json(providerFailure.body,{status:providerFailure.status});
  if(endpoint.endsWith('/oauth/token'))return Response.json({id_token:token,access_token:'server-only-token',token_type:'Bearer'});
  if(endpoint.endsWith('/.well-known/openid-configuration'))return Response.json({issuer:'https://api.whop.com',jwks_uri:'https://api.whop.com/.well-known/jwks.json'});
  if(endpoint.endsWith('/oauth/userinfo'))return Response.json(user);
@@ -31,11 +33,14 @@ const auth=await import(authUrl);
 const accessUrl=compile('../lib/order-access.ts',{'next/headers':cookiesUrl});
 const access=await import(accessUrl);
 const callbackDb={from(table){assert.equal(table,'referral_profiles');const filters={};const q={
- upsert:async(value)=>{upserts.push(value);return {error:null};},select(){return q;},eq(k,v){filters[k]=v;return q;},single:async()=>({data:{id:`profile_${filters.whop_user_id}`},error:null}),
+ upsert:async(value)=>{upserts.push(value);return {error:dbError};},select(){return q;},eq(k,v){filters[k]=v;return q;},single:async()=>({data:{id:`profile_${filters.whop_user_id}`},error:null}),
  };return q;}};
 globalThis.__oauthCallback={db:callbackDb,identity:async()=>{identityCalls++;return {userId:'user_A',email:'a@test.com',label:'person-a'};}};
-const helperUrl=url('export const referralLoginReady=()=>true;export const exchangeReferralIdentity=globalThis.__oauthCallback.identity;');
+globalThis.__oauthHelpers=oauth;
+globalThis.__oauthLog=async(_order,step,choice,reason)=>{loginLogs.push({step,choice,reason});};
+const helperUrl=url('export const referralLoginReady=()=>true;export const exchangeReferralIdentity=globalThis.__oauthCallback.identity;export const newReferralLogin=globalThis.__oauthHelpers.newReferralLogin;export const referralAuthorizeUrl=globalThis.__oauthHelpers.referralAuthorizeUrl;');
 const callback=await import(compile('../app/api/referrals/callback/route.ts',{
+ '@/lib/referral-login-errors':errorsUrl,'@/lib/log':url('export const logDecision=globalThis.__oauthLog'),
  '@/lib/referral-auth':authUrl,'@/lib/referrals':referralsUrl,'@/lib/whop-oauth':helperUrl,
  '@/lib/order-access':accessUrl,'@/lib/supabase':url('export const db=globalThis.__oauthCallback.db'),
 }));
@@ -43,6 +48,7 @@ const me=await import(compile('../app/api/referrals/me/route.ts',{'next/server':
 const logout=await import(compile('../app/api/referrals/logout/route.ts',{'@/lib/referral-auth':authUrl,'@/lib/order-access':accessUrl}));
 function reset(){
  jar=new Map();scope='production:biz';requests=[];identityCalls=0;upserts=[];
+ loginLogs=[];providerFailure=null;dbError=null;
  process.env.WHOP_CLIENT_ID='app_test';process.env.WHOP_CLIENT_SECRET='test-oauth-secret';process.env.REFERRAL_SESSION_SECRET='test-referral-session-secret-at-least-32-characters';process.env.PUBLIC_BASE_URL='https://second-look.test';process.env.REFERRALS_ENABLED='true';process.env.WHOP_ENVIRONMENT='production';process.env.ORDER_SESSION_SECRET='test-order-secret';
  user={sub:'user_A',email:'a@test.com',preferred_username:'person-a'};
 }
@@ -57,10 +63,10 @@ test('verified server-side identity must match both the signed ID token and user
  reset();const pending=oauth.newReferralLogin(scope);token=await jwt(pending);
  assert.deepEqual(await oauth.exchangeReferralIdentity('code',pending),{userId:'user_A',email:'a@test.com',label:'person-a'});
  const body=JSON.parse(requests[0].init.body);assert.equal(body.code_verifier,pending.verifier);assert.equal(body.client_secret,'test-oauth-secret');assert.equal(requests[2].init.headers.Authorization,'Bearer server-only-token');
- user.sub='user_B';await assert.rejects(oauth.exchangeReferralIdentity('code',pending),/identity mismatch/);
+ user.sub='user_B';await assert.rejects(oauth.exchangeReferralIdentity('code',pending),error=>error.code==='identity');
 });
 test('wrong nonce, invalid signature, and wrong audience cannot authenticate',async()=>{
- reset();const pending=oauth.newReferralLogin(scope);token=await jwt(pending,{nonce:'wrong'});await assert.rejects(oauth.exchangeReferralIdentity('code',pending),/nonce/);
+ reset();const pending=oauth.newReferralLogin(scope);token=await jwt(pending,{nonce:'wrong'});await assert.rejects(oauth.exchangeReferralIdentity('code',pending),error=>error.code==='nonce');
  const otherKeys=await generateKeyPair('RS256');token=await jwt(pending,{},otherKeys.privateKey);await assert.rejects(oauth.exchangeReferralIdentity('code',pending));
  token=await new SignJWT({nonce:pending.nonce}).setProtectedHeader({alg:'RS256'}).setIssuer('https://api.whop.com').setAudience('app_other').setSubject('user_A').setIssuedAt().setExpirationTime('5m').sign(keys.privateKey);await assert.rejects(oauth.exchangeReferralIdentity('code',pending));
 });
@@ -88,4 +94,27 @@ test('a different browser gets no earnings, and logout requires same-origin POST
  reset();const pending=await pendingSession();await callback.GET(callbackRequest(pending.state));const originalJar=jar;jar=new Map();assert.equal((await (await me.GET()).json()).referral,null);jar=originalJar;
  assert.equal((await logout.POST(new Request('https://second-look.test/api/referrals/logout',{method:'POST',headers:{origin:'https://evil.test'}}))).status,403);assert.ok(await auth.currentReferrer());
  assert.equal((await logout.POST(new Request('https://second-look.test/api/referrals/logout',{method:'POST',headers:{origin:'https://second-look.test'}}))).status,303);assert.equal(await auth.currentReferrer(),null);
+});
+
+test('provider failures get safe actionable categories without leaking provider bodies',async()=>{
+ for(const [status,provider,expected] of [[401,'invalid_client','token_client'],[403,'missing_permission','token_permission'],[400,'invalid_grant','token_expired']]){
+  reset();const pending=oauth.newReferralLogin(scope);providerFailure={status,body:{error:provider,error_description:'sensitive-code-and-client-secret'}};
+  await assert.rejects(oauth.exchangeReferralIdentity('code',pending),error=>error.code===expected && !JSON.stringify(error).includes('sensitive-code-and-client-secret'));
+ }
+});
+test('callback records only a stage, SQL code and reference when profile saving fails',async()=>{
+ reset();const pending=await pendingSession();dbError={code:'42P01',message:'sensitive database content user@example.com'};
+ const response=await callback.GET(callbackRequest(pending.state));const location=new URL(response.headers.get('location'));
+ assert.equal(location.searchParams.get('error'),'profile_save');assert.match(location.searchParams.get('ref'),/^[0-9a-f-]{36}$/);
+ assert.equal(loginLogs.length,1);assert.equal(loginLogs[0].choice,'profile_save');assert.match(loginLogs[0].reason,/db=42P01/);assert.ok(!JSON.stringify(loginLogs).includes('user@example.com'));assert.equal(await auth.currentReferrer(),null);
+});
+test('provider authorization errors are distinguished from user cancellation',async()=>{
+ reset();let pending=await pendingSession();let response=await callback.GET(callbackRequest(pending.state,'&error=invalid_scope&error_description=private-data'));
+ assert.equal(new URL(response.headers.get('location')).searchParams.get('error'),'authorization');assert.ok(!JSON.stringify(loginLogs).includes('private-data'));
+ reset();pending=await pendingSession();response=await callback.GET(callbackRequest(pending.state,'&error=access_denied'));assert.equal(new URL(response.headers.get('location')).searchParams.get('error'),'canceled');
+});
+test('login on a preview domain moves to the callback host before setting session state',async()=>{
+ reset();const login=await import(compile('../app/api/referrals/login/route.ts',{'@/lib/referral-auth':authUrl,'@/lib/referrals':referralsUrl,'@/lib/whop-oauth':helperUrl,'@/lib/order-access':accessUrl}));
+ let response=await login.GET(new Request('https://preview.test/api/referrals/login'));assert.equal(response.headers.get('location'),'https://second-look.test/api/referrals/login');assert.equal(jar.size,0);
+ response=await login.GET(new Request('https://second-look.test/api/referrals/login'));assert.equal(new URL(response.headers.get('location')).hostname,'api.whop.com');assert.ok((await auth.referralSession()).pending);
 });
