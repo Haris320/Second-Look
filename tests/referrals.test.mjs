@@ -75,8 +75,8 @@ test('refund before payout cancels; refund during or after payout requires recov
 test('failed refunds do not cancel; disputes do',async()=>{
  reset();state.refundStatus='failed';await handleReferralEvent('refund.updated','refund');assert.equal(state.reward.state,'pending');await handleReferralEvent('dispute.created','dispute');assert.equal(state.reward.state,'canceled');
 });
-test('identity mismatch, amount mismatch, and self-referrals never transfer',async()=>{
- for(const mutate of [()=>state.payment.user.id='evil',()=>state.payment.usd_total.amount='1.00',()=>state.profile.whop_user_id='user_b',()=>state.payment.account_id='other']){
+test('identity and amount mismatches never transfer',async()=>{
+ for(const mutate of [()=>state.payment.user.id='evil',()=>state.payment.usd_total.amount='1.00',()=>state.payment.account_id='other']){
  reset();mutate();await payReferral('reward');assert.equal(state.createCalls.length,0);assert.equal(state.reward.state,'canceled');
  }
 });
@@ -105,4 +105,8 @@ test('cron requires a matching configured secret before running payouts',async()
  process.env.CRON_SECRET='test-secret';assert.equal((await GET(new Request('https://example.test',{headers:{authorization:'Bearer wrong'}}))).status,401);assert.equal(calls,0);
  assert.equal((await GET(new Request('https://example.test',{headers:{authorization:'Bearer test-secret'}}))).status,200);assert.equal(calls,1);
  delete process.env.CRON_SECRET;
+});
+
+test('self-referral pays the same fixed $3 to the buyer’s Whop account',async()=>{
+ reset();state.profile.whop_user_id='user_b';await payReferral('reward');assert.equal(state.reward.state,'paid');assert.equal(state.createCalls.length,1);assert.equal(state.createCalls[0].destination_id,'user_b');assert.equal(state.createCalls[0].amount,3);
 });

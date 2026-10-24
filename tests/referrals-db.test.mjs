@@ -9,6 +9,7 @@ test('referral ledger: first purchase, immutable attribution, duplicate claims a
  await db.exec(`create role anon;create role authenticated;create role service_role;
  create table orders(id uuid primary key,email text,whop_payment_id text,paid_at timestamptz);`);
  await db.exec(fs.readFileSync(new URL('../supabase/migrations/2026-10-24-referrals.sql',import.meta.url),'utf8'));
+ await db.exec(fs.readFileSync(new URL('../supabase/migrations/2026-10-24-open-referrals.sql',import.meta.url),'utf8'));
  const scope='production:biz';
  const record=async(id,payment,buyer,email)=>db.query('select record_referral_purchase($1,$2,$3,$4,$5)',[scope,id,payment,buyer,email]);
  const order=async(payment,email,ref=null)=>{
@@ -25,7 +26,7 @@ test('referral ledger: first purchase, immutable attribution, duplicate claims a
  const repeat=await order('pay_repeat','different@test.com',ref.id);await record(repeat,'pay_repeat','user_b','different@test.com');
  const self=await order('pay_self','a@test.com',ref.id);await record(self,'pay_self','user_a','a@test.com');
  const alias=await order('pay_alias','A@test.com',ref.id);await record(alias,'pay_alias','user_alias',' A@test.com ');
- assert.equal((await db.query('select count(*)::int n from referral_rewards')).rows[0].n,1,'repeat and self-referrals are ineligible');
+ assert.equal((await db.query('select count(*)::int n from referral_rewards')).rows[0].n,1,'repeat purchases remain ineligible, including a returning buyer referring themselves');
  await assert.rejects(record(b,'fake','intruder','evil@test.com'));
  await assert.rejects(record(b,'pay_b','intruder','evil@test.com'));
  const old=await order('pay_old','old@test.com');
@@ -45,6 +46,18 @@ test('referral ledger: first purchase, immutable attribution, duplicate claims a
  await db.query("select finish_referral_transfer($1,'transfer_e','succeeded')",[r.id]);
  assert.equal((await db.query('select state from referral_rewards where id=$1',[r.id])).rows[0].state,'recovery_needed','late success cannot erase a refund');
  await assert.rejects(db.query("select finish_referral_transfer($1,'transfer_other','succeeded')",[r.id]));
+ // A Whop sign-in creates a referrer with zero orders; their own first purchase is eligible.
+ const newcomer=(await db.query("insert into referral_profiles(scope,whop_user_id,email) values($1,'user_new','new@test.com') returning id",[scope])).rows[0];
+ const firstSelf=await order('pay_first_self','new@test.com',newcomer.id);
+ await record(firstSelf,'pay_first_self','user_new','new@test.com');
+ await record(firstSelf,'pay_first_self','user_new','new@test.com');
+ const selfRewards=(await db.query("select * from referral_rewards where profile_id=$1",[newcomer.id])).rows;assert.equal(selfRewards.length,1);assert.equal(selfRewards[0].amount_cents,300);
+ const secondSelf=await order('pay_second_self','new@test.com',newcomer.id);await record(secondSelf,'pay_second_self','user_new','new@test.com');
+ assert.equal((await db.query('select count(*)::int n from referral_rewards where profile_id=$1',[newcomer.id])).rows[0].n,1);
+ // Another non-customer can refer a distinct first-time buyer without purchasing themselves.
+ const nonBuyer=(await db.query("insert into referral_profiles(scope,whop_user_id,email) values($1,'user_nonbuyer','nonbuyer@test.com') returning id",[scope])).rows[0];
+ const friend=await order('pay_friend','friend@test.com',nonBuyer.id);await record(friend,'pay_friend','user_friend','friend@test.com');
+ assert.equal((await db.query('select count(*)::int n from referral_rewards where profile_id=$1',[nonBuyer.id])).rows[0].n,1);
  await db.exec('set role anon');await assert.rejects(db.query('select * from referral_profiles'));await assert.rejects(db.query('select * from referral_rewards'));await assert.rejects(record(a,'pay_a','user_a','a@test.com'));
  } finally {await db.close();}
 });

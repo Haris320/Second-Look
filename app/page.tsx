@@ -25,6 +25,7 @@ export default function Home() {
             <Link href="/order" className="button button-dark">
               Get my profile reviewed <ArrowRight size={17} />
             </Link>
+            <Link href="/refer" className="button button-outline">Refer & earn $3</Link>
           </div>
           <p className="editorial-small">
             $15 for one reviewer · $40 for three · Results by tonight
@@ -195,6 +196,14 @@ export default function Home() {
             </details>
           ))}
         </div>
+      </section>
+      <section className="wrap editorial-section" id="refer">
+        <div className="editorial-section-heading">
+          <span className="section-number">SHARE SECOND LOOK</span>
+          <h2>Know someone who could use a second opinion?</h2>
+          <p>Earn $3 when they buy their first review through your link. Anyone can refer—no purchase required. Just connect a Whop account.</p>
+        </div>
+        <Link href="/refer" className="button button-outline">Get my referral link <ArrowRight size={17} /></Link>
       </section>
       <section className="wrap editorial-end">
         <h2>

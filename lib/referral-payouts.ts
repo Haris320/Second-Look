@@ -62,7 +62,7 @@ export async function payReferral(id:string) {
    const {data:profile,error:profileError}=await db.from("referral_profiles").select("whop_user_id").eq("id",reward.profile_id).eq("scope",referralScope()).single();
    if(orderError || profileError || !order || !profile) throw new Error("Referral payout evidence unavailable");
    if(payment.user?.id!==reward.buyer_id || order.whop_payment_id!==payment.id || payment.account_id!==whopBizId ||
-      profile.whop_user_id===reward.buyer_id || expectedOrderCents(order.tier,order.review_target)!==toCents(payment.usd_total?.amount ?? payment.total?.amount)) {
+      expectedOrderCents(order.tier,order.review_target)!==toCents(payment.usd_total?.amount ?? payment.total?.amount)) {
      await invalidateReferral(payment.id,"Payment identity or amount mismatch"); return;
    }
    if(payment.status!=="paid" || payment.substatus!=="succeeded" || payment.refunded_at || payment.auto_refunded ||

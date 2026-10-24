@@ -50,6 +50,14 @@ export async function referralSummary(orderId: string) {
  const { data: profile, error } = await db.from("referral_profiles").select("id,code").eq("scope", referralScope()).eq("whop_user_id", order.buyer_whop_user_id).maybeSingle();
  if (error) throw error;
  if (!profile) return null;
+ return profileReferralSummary(profile.id);
+}
+
+export async function profileReferralSummary(profileId:string) {
+ if (!referralsEnabled()) return null;
+ const {data:profile,error}=await db.from("referral_profiles").select("id,code").eq("id",profileId).eq("scope",referralScope()).maybeSingle();
+ if(error) throw error;
+ if(!profile) return null;
  // Count in the database, without exposing friends' identities or truncating at the API row limit.
  const counts = await Promise.all(["pending", "paid", "attention"].map(async group => {
    const states = group === "pending" ? ["pending","transferring"] : group === "paid" ? ["paid"] : ["needs_attention","recovery_needed"];

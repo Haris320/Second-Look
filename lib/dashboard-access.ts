@@ -29,8 +29,11 @@ export async function dashboardAccess() {
   if (!process.env.DASHBOARD_PASSWORD) return false;
   const token = (await cookies()).get(name)?.value;
   if (!token) return false;
-  const [expiry, mac] = token.split(".");
-  if (!expiry || !mac || Number(expiry) < Date.now() / 1000) return false;
+  // Reject malformed cookies before comparing MAC bytes (including non-ASCII input).
+  const match = /^(\d{1,12})\.([a-f0-9]{64})$/.exec(token);
+  if (!match) return false;
+  const [, expiry, mac] = match;
+  if (Number(expiry) <= Date.now() / 1000) return false;
   const expected = sign(expiry);
   return (
     mac.length === expected.length &&

@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/order/:id", headers: privateHeaders },
+      { source: "/refer", headers: privateHeaders },
+      { source: "/api/referrals/:path*", headers: privateHeaders },
       { source: "/api/orders/:path*", headers: privateHeaders },
     ];
   },
