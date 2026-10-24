@@ -35,6 +35,8 @@ const {processFeedback}=await import(compile('../lib/feedback-quality.ts',{
  './feedback-actions':compile('../lib/feedback-actions.ts'),
  './reviewer-access':url('export const parseReviewAnswers=x=>x'),
  './log':url('export async function logDecision(){}'),
+ './report':url('export async function deliverReportIfComplete(){return {state:"waiting"}}'),
+ 'next/server':url('export function after(fn){fn()}'),
  sharp:url('export default function sharp(){const s={rotate:()=>s,resize:()=>s,flatten:()=>s,jpeg:()=>s,toBuffer:async()=>Buffer.from("synthetic")};return s;}')
 }));
 function reset(){

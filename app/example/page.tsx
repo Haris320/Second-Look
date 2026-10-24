@@ -28,7 +28,6 @@ export default function Example() {
             "Your profile feels warm and approachable. The biggest opportunity is making your interests more specific, so someone has a natural reason to start a conversation.",
           like_count: 2,
           review_count: 3,
-          words: ["Warm", "Curious", "Easygoing"],
           top_fixes: [
             {
               title: "Lead with your clearest photo",
@@ -48,8 +47,13 @@ export default function Example() {
           ],
           prompt_feedback:
             "A playful, specific answer gives people something to respond to. Keep the humor, and replace a broad list of interests with one memorable detail.",
-          prompt_rewrites: [
-            "On a mission to find the best dumplings in the city. Taking recommendations.",
+          reviews: [
+            {
+              like: "yes",
+              works: "The hiking photo is the strongest one: good light, you're clearly the person in it, and it gives me something to ask about.",
+              changes: "I'd move the group photo out of the first slot. It took me a second to work out which person you are.",
+              prompts: "The bio joke landed. The 'I love food' line is the one I'd make more specific.",
+            },
           ],
         }}
       />

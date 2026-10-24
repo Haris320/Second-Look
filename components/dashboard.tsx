@@ -10,9 +10,13 @@ type Data = {
     review_target: number;
     amount_cents: number | null;
     created_at: string;
+    paid_at: string | null;
+    delivered_at: string | null;
+    is_test: boolean;
   }[];
   decisions: {
     id: string;
+    order_id: string | null;
     step: string;
     choice: string;
     reason: string;
@@ -39,9 +43,12 @@ export function Dashboard() {
     }
   }, []);
   // Fetch completion updates state asynchronously; this effect subscribes to external data.
+  // Refreshes every 15 seconds so the decision log moves on its own during the demo.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    const timer = setInterval(() => void load(), 15_000);
+    return () => clearInterval(timer);
   }, [load]);
   async function login(e: React.FormEvent) {
     e.preventDefault();
@@ -100,7 +107,17 @@ export function Dashboard() {
         </button>
       </form>
     );
-  const paid = data.orders.filter((o) => o.status !== "pending_payment");
+  const real = data.orders.filter((o) => !o.is_test);
+  const paid = real.filter((o) => o.paid_at);
+  const delivered = paid.filter((o) => o.status === "done" && o.delivered_at);
+  const medianMinutes = (() => {
+    const mins = delivered
+      .map((o) => (Date.parse(o.delivered_at!) - Date.parse(o.paid_at!)) / 60_000)
+      .sort((a, b) => a - b);
+    if (!mins.length) return null;
+    const mid = Math.floor(mins.length / 2);
+    return mins.length % 2 ? mins[mid] : (mins[mid - 1] + mins[mid]) / 2;
+  })();
   return (
     <>
       <div className="page-heading">
@@ -111,7 +128,7 @@ export function Dashboard() {
           </h1>
           <p>
             Live data for the latest 100 orders. No sample orders or simulated
-            revenue.
+            revenue; team test purchases are marked and excluded from the totals.
           </p>
         </div>
         <button
@@ -130,18 +147,19 @@ export function Dashboard() {
           ],
           ["Paid orders", paid.length],
           [
-            "Reviews received",
-            data.orders.reduce((sum, o) => sum + o.reviews_done, 0),
+            "Reviews approved",
+            paid.reduce((sum, o) => sum + o.reviews_done, 0),
           ],
+          ["Reports delivered", delivered.length],
           [
-            "Reports delivered",
-            data.orders.filter((o) => o.status === "done").length,
+            "Median paid → report",
+            medianMinutes === null ? "—" : medianMinutes < 90 ? `${Math.round(medianMinutes)} min` : `${(medianMinutes / 60).toFixed(1)} h`,
           ],
         ].map(([label, value]) => (
           <article className="stat" key={label}>
             <span>{label}</span>
             <strong>{value}</strong>
-            <small>Latest 100 orders</small>
+            <small>Latest 100 orders, tests excluded</small>
           </article>
         ))}
       </div>
@@ -161,8 +179,8 @@ export function Dashboard() {
             <tbody>
               {data.orders.map((o) => (
                 <tr key={o.id}>
-                  <td>{o.id.slice(0, 8)}</td>
-                  <td>Profile review</td>
+                  <td>{o.id.slice(0, 8)}{o.is_test ? " (test)" : ""}</td>
+                  <td>{o.review_target === 1 ? "One reviewer" : "Three reviewers"}{o.amount_cents ? ` · $${o.amount_cents / 100}` : ""}</td>
                   <td>
                     <span className="status-badge">
                       {o.status.replaceAll("_", " ")}
@@ -189,6 +207,8 @@ export function Dashboard() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>WHEN</th>
+                <th>ORDER</th>
                 <th>STEP</th>
                 <th>DECISION</th>
                 <th>REASON</th>
@@ -197,6 +217,8 @@ export function Dashboard() {
             <tbody>
               {data.decisions.map((d) => (
                 <tr key={d.id}>
+                  <td>{new Date(d.created_at).toLocaleTimeString()}</td>
+                  <td>{d.order_id ? d.order_id.slice(0, 8) : "—"}</td>
                   <td>{d.step}</td>
                   <td>{d.choice}</td>
                   <td>{d.reason}</td>

@@ -1,6 +1,6 @@
 # checklist.md: Second Look build order
 
-> Pricing update (2026-10-24): $15 for 1 reviewer (`quick`) or $40 for 3 reviewers (`full`), both with up to 10 screenshots. This supersedes older prices/counts below. Existing paid $15/3-review orders keep their original review target. Recruitment now creates one opportunity per order; see docs/terac-recruitment.md.
+> **Status (2026-10-24, 19:15 UTC):** the loop is built end to end and live. Pricing is $15 for 1 reviewer (`quick`) or $40 for 3 (`full`), up to 10 screenshots. Recruitment creates **one Terac opportunity per order** (docs/terac-recruitment.md), not shared panels; anything below about "panels" is historical. Current state, order table and open issues: `docs/handoff.md`. Recovery: `POST /api/agent/reconcile` every 3 minutes (README).
 
 Turns `plan.md` into steps. **A** = backend/agent, **B** = frontend/sales, **You** = a human-only task (accounts, keys, asking staff).
 Each step has a **Check** that proves it works. Don't start the next step on the same track until its check passes.
@@ -33,18 +33,18 @@ Every paid order runs through these steps with no one on the team touching it. E
 
 | # | Step | Owner | Status |
 |---|---|---|---|
-| 1 | Customer uploads and pays on a per-order Whop checkout. The webhook verifies the signature, re-fetches the payment, and marks the order `screening` [`payment/paid`] | Haris | Live (marks `paid` until step 2 deploys) |
-| 2 | **AI first read:** Claude checks the screenshots are a dating profile, with nothing explicit and no minor. Pass → `paid`, instant feedback on `/order/[id]` labeled as AI [`first_read/passed`]. Not a dating profile or screenshots missing → `needs_reupload`: the customer re-uploads on `/order/[id]` and the read runs again [`first_read/needs_reupload`, `reupload/screening`]. Explicit, looks under 18, or the check errors twice → `held` for refund [`first_read/retry`, `first_read/held`]. No reviewer sees anything but `paid` | Haris | Built; waits on the schema SQL, then deploy |
-| 3 | Hand the passed order to the agent: `POST /api/agent/order-paid` → `onOrderPaid(orderId)` | Haris calls it, partner owns the route | Partner (mock mode) |
-| 4 | **Route to the right panel:** `orders.audience` (`women_21_35_us` / `men_21_35_us`) picks the Terac panel; the reviewer page assigns the oldest `paid` order for its audience, `paid → in_review` [`review/assigned`] | Partner | Partner (mock mode) |
-| 5 | **Panels on and off:** resume a panel when paid orders wait for its audience, pause it when none do [`panel/resumed`, `panel/paused`] | Partner | Partner (mock mode) |
-| 6 | Reviewer submits; answers saved; redirect to the Terac callback | Partner | Partner (mock mode) |
-| 7 | **Quality check:** Claude approves (Terac pays the reviewer) or rejects (no pay; the order gets another reviewer) each submission; `reviews_done` counts approved only [`review/approved`, `review/rejected`] | Partner | Partner (mock mode) |
-| 8 | **Credits:** after each approval, check the Terac balance. If it runs low, log an alert so Haris tops up; no automatic sales pause. `setSalesOpen` is an emergency switch only [`credits/low`] | Partner logs the alert; Haris tops up | Partner (mock mode) |
+| 1 | Customer uploads and pays on a per-order Whop checkout. The webhook verifies the signature, re-fetches the payment, and marks the order `screening` [`payment/paid`] | Haris | **Live** (7 real payments) |
+| 2 | **AI first read:** Claude checks the screenshots are a dating profile, with nothing explicit and no minor. Pass → `paid`, instant feedback on `/order/[id]` labeled as AI [`first_read/passed`]. Not a dating profile or screenshots missing → `needs_reupload`: the customer re-uploads on `/order/[id]` and the read runs again [`first_read/needs_reupload`, `reupload/screening`]. Explicit, looks under 18, or the check errors twice → `held` for refund [`first_read/retry`, `first_read/held`]. No reviewer sees anything but `paid` | Haris | **Live** |
+| 3 | Hand the passed order to the agent: `runFirstRead` calls `recruitOrder` directly inside the webhook's `after()`; `POST /api/agent/order-paid` retries one order; reconcile retries all | Both | **Live** |
+| 4 | **Recruit for the order:** `recruitOrder` creates a Terac draft filtered to the order's audience (21–35, US, gender), screener, `manual_review`, 5 min, task URL with a private token, checks the quote against the cap and balance, launches [`recruitment/launched`, `needs_attention`, `retryable`, `reconciled`, `reset`] | Partner | **Live** (5 real launches) |
+| 5 | **Reviewer opens `/review`** from Terac: submission verified via MCP, slot assigned atomically, order `paid → in_review`, signed 10-minute image URLs [`review/assigned`] | Partner | **Live** (1 real assignment) |
+| 6 | Reviewer submits; answers saved with server-measured duration (≥ 60 s); redirect to the Terac callback [`review/submitted`] | Partner | Built; first real submit pending |
+| 7 | **Quality check:** Terac webhook `awaiting_review` (or reconcile polling) → Claude grades against the screenshots → approve (Terac pays) or reject via MCP; `reviews_done` counts approved only [`review_quality/approved`, `rejected`, `needs_attention`] | Partner | Built and unit-tested; first real check pending |
+| 8 | **Credits:** reconcile checks the Terac balance each run and logs `credits/low` under $18. No automatic sales pause; Haris tops up | Both | **Live** (fired at $10) |
 | 2b | **"Payment received" Whop message:** thanks, private link, results by tonight, results also arrive here. Sent from the webhook alongside the first read, through a Whop support chat as the business [`notify/paid_sent` or `notify/paid_failed`] | Haris | Live |
-| 9 | **Report:** at `review_target`, Claude builds `report_json` from approved reviews only (AI rewrites labeled); status `done`, `delivered_at` set [`report/delivered`] | Partner writes it, Haris's page renders it | Page live; writer is partner's |
-| 9b | **"Results are in" Whop message:** right after the update that sets `status = 'done'` succeeds, call `await notifyResultsReady(orderId)` from `lib/notify.ts`. It never throws and logs its own row [`notify/results_sent` or `notify/results_failed`] | Partner adds the one call; Haris owns `lib/notify.ts` | Function live, call not wired |
-| 10 | **Delete screenshots:** storage files and `screenshots` rows, right after delivery [`privacy/deleted`] | Partner | Partner (mock mode) |
+| 9 | **Report:** at `review_target`, Claude summarizes approved reviews only into `report_json` (summary, top fixes, prompt feedback, each reviewer's own words; `review_ids`); status `done`, `delivered_at` [`report/delivered`, `report/failed`] | Partner | Built; first real delivery pending |
+| 9b | **"Results are in" Whop message:** `notifyResultsReady(orderId)` right after `status = 'done'` [`notify/results_sent` or `notify/results_failed`] | Haris | Wired in `lib/report.ts`; first real send pending |
+| 10 | **Delete screenshots:** storage files and `screenshots` rows, right after delivery; reconcile deletes leftovers [`privacy/deleted`, `privacy/delete_failed`] | Partner | Built; first real deletion pending |
 | 11 | Held orders (explicit, under 18, or check errored twice): refund in the Whop dashboard. The agent never moves money, so this is the one human step | Haris (human) | Manual by design |
 
 ### Proposed `report_json` shape (agree before building)
@@ -83,17 +83,17 @@ Written once by partner's code, read by `/order/[id]`. Photos are referred to by
 ## Decisions (team, 2026-10-24)
 
 - **Terac callback:** `https://terac.com/api/external/callback?teracSubmissionId={id}&result=completed`. Other `result` values: `screened_out`, `quota_full`, `rejected`. A reviewer who arrives to an empty queue is sent back with `result=quota_full`.
-- **Panels:** start with two, `women_21_35_us` and `men_21_35_us`, each sized to about half our **$100** Terac credits once we know the cost per reviewer. Launch a new one when a panel fills. **Pause** panels when no paid orders are waiting and **resume** when one arrives.
+- **Recruitment (supersedes panels):** one Terac opportunity per paid order, `num_participants` = the purchased reviewer count, $6 per reviewer. Credits were $100; five launches used $90 by 19:08 UTC. Top up before selling more.
 - **Who decides:** plain code makes routine MCP calls (launch, pause, resume, list). **Claude decides** whether to approve or reject reviews, when to pause sales because credits are low, and writes the reports. Every decision is logged to `decisions`.
 - **No model fallback:** Claude calls don't use the server-side `fallbacks` option, so behavior stays predictable.
 - **Privacy:** screenshots are deleted **right after the report is delivered**, not after 7 days. Page wording: "Your screenshots are deleted as soon as your report is delivered."
 - **Whop:** production by default; sandbox only when `WHOP_ENVIRONMENT=sandbox`. If we buy our own product to test, refund it afterwards, and ask the organizers whether team purchases count toward revenue.
 - **Submission:** public repo, deployment, 2-minute video, Whop Business ID (details in the new CLAUDE.md/plan.md).
-- **Pricing (supersedes the CLAUDE.md table):** one offer, **$15 for 3 reviews** (`REVIEW_OFFER` in `lib/tiers.ts`, stored as tier `quick`). Checkout is created per order from `/order`; the webhook only accepts $15 payments.
+- **Pricing (supersedes the CLAUDE.md table):** **$15 for 1 reviewer** (`quick`) or **$40 for 3** (`full`), `TIERS` in `lib/tiers.ts`. Checkout is created per order from `/order`; the webhook accepts $15 and $40. Legacy $15/3-review orders keep their target.
 - **Audiences:** customers choose one of exactly two: **"Women, 21–35, US"** (`women_21_35_us`) or **"Men, 21–35, US"** (`men_21_35_us`). No custom age ranges. The list lives in `AUDIENCES` in `lib/tiers.ts`, and each key matches one of the two Terac panels. `/api/orders` rejects anything else.
-- **Marketplace: later.** Parked. No Whop store products until a marketplace purchase can be linked to an order securely (email alone isn't proof of payment, so `/api/orders/claim` stays disabled). Haris is asking Whop staff whether this should be a Whop app instead, which might solve linking. Don't design or build it until that answer is in.
+- **Marketplace: still parked.** Proposed design (from Whop docs, 2026-10-24): Whop appends `payment=pay_…` and `status=succeeded|failed|canceled` to a checkout's `redirect_url`/`returnUrl`, with our own query params intact. So a store product's post-purchase link can point at `/start`; `/start` reads `payment`, and the server calls `whop.payments.retrieve(payment)` and checks `status === "paid"`, the amount, and that no order already has that `whop_payment_id`, then claims the `awaiting_upload` order the webhook created for that payment and shows the upload form. Fulfilment still comes from the `payment.succeeded` webhook; the redirect only claims, it never trusts the browser. Not built; `/api/orders/claim` stays disabled until it is.
 - **Delivery promise:** "Results by tonight" everywhere (landing, order form, order page, Whop checkout description) while Terac is down. Tighten it once Terac is live and we know real turnaround.
-- **Test order `b5a2985e…`:** kept on purpose (no refund, no delete). It will be the first real end-to-end test with Terac reviewers. Its audience is `men_18_31_us` from the old age-range form, so it matches no panel until it's moved to a valid audience.
+- **Test order `b5a2985e…`:** Haris's $15 test; `needs_reupload`, marked `manual/test_order` (excluded from the dashboard). Never recruits. Refund in Whop, then delete it with its files, `screenshots` rows and `decisions` rows.
 
 ---
 

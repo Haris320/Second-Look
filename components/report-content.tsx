@@ -6,7 +6,9 @@ export type ProfileReport = {
   top_fixes?: { title: string; description: string }[];
   prompt_feedback?: string;
   prompt_rewrites?: string[];
+  reviews?: { like: "yes" | "maybe" | "no"; works: string; changes: string; prompts: string }[];
 };
+const LIKE_LABELS = { yes: "Would like this profile", maybe: "Maybe", no: "Would pass" } as const;
 export type AgentReport = {
   version: number;
   review_count: number;
@@ -144,6 +146,32 @@ export function ReportContent({
           <span className="eyebrow">YOUR PROMPTS</span>
           <h2>Give them something to ask about.</h2>
           <p>{report.prompt_feedback}</p>
+        </article>
+      )}
+      {!!report.reviews?.length && (
+        <article className="report-card wide">
+          <span className="eyebrow">IN THEIR OWN WORDS</span>
+          <h2>What each reviewer said.</h2>
+          {report.reviews.map((review, i) => (
+            <div key={i}>
+              <h3>
+                Reviewer {i + 1} · {LIKE_LABELS[review.like]}
+              </h3>
+              <p>
+                <b>What works:</b> {review.works}
+              </p>
+              <p>
+                <b>What to change:</b> {review.changes}
+              </p>
+              <p>
+                <b>Bio and prompts:</b> {review.prompts}
+              </p>
+            </div>
+          ))}
+          <p className="caption">
+            Written by real people. The summary above was put together by AI
+            from these reviews.
+          </p>
         </article>
       )}
       {!!report.prompt_rewrites?.length && (

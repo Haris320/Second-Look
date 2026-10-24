@@ -176,11 +176,11 @@ export default function Home() {
             ],
             [
               "Can other people see my screenshots?",
-              "Your screenshots aren’t public. Access is limited to your private order and authorized reviewers. Please leave out private messages or other people’s personal information.",
+              "Your screenshots aren’t public. Access is limited to your private order and your assigned reviewers, and they’re deleted as soon as your report is delivered. Please leave out private messages or other people’s personal information.",
             ],
             [
               "Where does AI come in?",
-              "People do the reviewing. Right after you pay, AI gives you an instant first read and checks your screenshots are a dating profile with nothing explicit before any reviewer sees them. AI also helps summarize the human feedback and suggest prompt rewrites. Anything AI-written is labeled.",
+              "People do the reviewing. Right after you pay, AI gives you an instant first read and checks your screenshots are a dating profile with nothing explicit before any reviewer sees them. AI also checks each review for effort and respect before the reviewer is paid, and writes the summary of the human feedback. Anything AI-written is labeled.",
             ],
             [
               "Will this get me more matches?",
