@@ -5,7 +5,7 @@ export const metadata = {
 };
 export default function InsightsPage() {
   return (
-    <main id="main" className="wrap" style={{ maxWidth: 960, paddingTop: 64, paddingBottom: 80 }}>
+    <main id="main" className="wrap insights-page">
       <InsightsPostView />
     </main>
   );
