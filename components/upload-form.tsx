@@ -394,7 +394,8 @@ export function UploadForm() {
             )}
             <div className="form-bottom">
               <span>
-                <LockKeyhole size={14} /> Your profile stays private
+                <LockKeyhole size={14} /> Your profile stays private.
+                Screenshots are deleted after your report is delivered.
               </span>
               <button
                 className="button button-coral"
@@ -454,6 +455,11 @@ export function UploadForm() {
               <p className="field-help" id="age-help">
                 We suggest reviewers within 7 years of your age. All reviewers
                 must be 18 or older.
+              </p>
+              <p className="field-help">
+                Who’s reviewing: real people recruited through Terac who match
+                the reviewers you choose here. Every review in your report comes
+                from one of them.
               </p>
               <label className="field-label" htmlFor="reviewer-gender">
                 Reviewer gender
