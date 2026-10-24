@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowUpRight,
-  Check,
   CheckCheck,
   Clock3,
   ImagePlus,
@@ -21,6 +20,7 @@ import { ReportContent, type ProfileReport } from "./report-content";
 import { ReuploadForm } from "./reupload-form";
 import { ReferralPanel, type ReferralSummary } from "./referral-panel";
 import { PrivateLink } from "./private-link";
+import { MoreOpinions, OrderProgress } from "./order-progress";
 type OrderData = {
   order: {
     id: string;
@@ -139,6 +139,13 @@ export function OrderStatus({ id }: { id: string }) {
   return (
     <>
       {data.privateLink && <PrivateLink link={data.privateLink} />}
+      <OrderProgress status={order.status} done={order.reviews_done} target={order.review_target} />
+      {done && order.report_json && (
+        <section className="dashboard-section" style={{ marginBottom: 28 }}>
+          <ReportContent report={order.report_json} />
+          <MoreOpinions audience={order.audience} />
+        </section>
+      )}
       <div className="page-heading">
         <div>
           <p className="eyebrow">YOUR SECOND LOOK</p>
@@ -213,51 +220,6 @@ export function OrderStatus({ id }: { id: string }) {
                     : "You haven’t been charged. Review your details before heading to Whop."}
           </p>
           {reupload && <ReuploadForm id={id} onDone={() => void load()} />}
-          <ol className="status-timeline">
-            {[
-              {
-                title: "Profile uploaded",
-                description: allSaved
-                  ? "Stored privately, ready for a second look"
-                  : "Some files are missing. Return to the uploader to retry, or delete this draft.",
-                complete: allSaved,
-              },
-              {
-                title: "Payment confirmed",
-                description: "Secure one-time payment through Whop",
-                complete: paid,
-              },
-              {
-                title: "Human reviews",
-                description: `${order.reviews_done} of ${order.review_target} perspectives received`,
-                complete: done,
-              },
-              {
-                title: "Your results",
-                description: done
-                  ? "Your report is ready below"
-                  : "A clear list of what to keep and what to improve",
-                complete: done,
-              },
-            ].map((s, i) => (
-              <li
-                key={s.title}
-                className={
-                  s.complete
-                    ? "done"
-                    : (paid ? i === 2 : i === 1)
-                      ? "current"
-                      : ""
-                }
-              >
-                <i>{s.complete ? <Check size={15} /> : i + 1}</i>
-                <div>
-                  <strong>{s.title}</strong>
-                  <span>{s.description}</span>
-                </div>
-              </li>
-            ))}
-          </ol>
           {screenshots.length > 0 && (
             <>
               <p className="micro">YOUR UPLOADED SCREENSHOTS</p>
@@ -400,11 +362,6 @@ export function OrderStatus({ id }: { id: string }) {
               </p>
             </article>
           </div>
-        </section>
-      )}
-      {done && order.report_json && (
-        <section className="dashboard-section">
-          <ReportContent report={order.report_json} />
         </section>
       )}
     </>

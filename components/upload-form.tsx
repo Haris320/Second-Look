@@ -27,7 +27,7 @@ type Prepared = {
   uploads: { path: string; token: string }[];
   storageUrl: string;
 };
-export function UploadForm({ initialTier = "quick" }: { initialTier?: Tier }) {
+export function UploadForm({ initialTier = "quick", initialAudience = "women_21_35_us" }: { initialTier?: Tier; initialAudience?: Audience }) {
   const [tier, setTier] = useState<Tier>(initialTier);
   const offer = TIERS[tier];
   const router = useRouter();
@@ -44,7 +44,7 @@ export function UploadForm({ initialTier = "quick" }: { initialTier?: Tier }) {
   const [progress, setProgress] = useState(0);
   const [email, setEmail] = useState("");
   const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
-  const [audience, setAudience] = useState<Audience>("women_21_35_us");
+  const [audience, setAudience] = useState<Audience>(initialAudience);
   const [ownProfile, setOwn] = useState(false);
   const [adult, setAdult] = useState(false);
   const [zoom, setZoom] = useState<Shot | null>(null);
