@@ -4,6 +4,7 @@ import { logDecision } from "@/lib/log";
 import { validateFiles, type UploadManifest } from "@/lib/uploads";
 import { REVIEW_OFFER, isAudience } from "@/lib/tiers";
 import { grantAccess, sameOrigin, privateHeaders } from "@/lib/order-access";
+import { issueOrderLink } from "@/lib/order-links";
 
 export async function POST(request: Request) {
   if (!sameOrigin(request))
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
       "Standard $15 order with 3 reviewers; awaiting payment",
     );
     await grantAccess(id);
+    await issueOrderLink(id);
     return Response.json(
       { orderId: id, uploads, storageUrl: process.env.SUPABASE_URL },
       { headers: privateHeaders },

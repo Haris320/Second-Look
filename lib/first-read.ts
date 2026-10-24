@@ -170,6 +170,14 @@ export async function readProfile(
       return {
         failure: `No usable answer (stop reason ${response.stop_reason})`,
       };
+    // An answer that skips or invents a screenshot is a failed check: retried once, then held.
+    const checked = response.parsed_output.screenshot_checks.map((c) => c.position);
+    if (
+      checked.length !== shots.length ||
+      new Set(checked).size !== shots.length ||
+      shots.some((s) => !checked.includes(s.position))
+    )
+      return { failure: "Claude's answer didn't account for every screenshot" };
     return {
       read: response.parsed_output,
       positions: shots.map((s) => s.position),

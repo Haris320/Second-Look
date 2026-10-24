@@ -1,4 +1,4 @@
--- AI first read: three new order statuses and two columns. Run once in Supabase → SQL Editor.
+-- AI first read: three new order statuses and two columns. Applied 2026-10-24.
 alter table orders drop constraint orders_status_check;
 alter table orders add constraint orders_status_check
   check (status in ('pending_payment', 'awaiting_upload', 'screening', 'needs_reupload', 'held', 'paid', 'in_review', 'done'));
