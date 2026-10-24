@@ -17,7 +17,7 @@ Start with `git pull`. Then read `checklist.md` (decisions and the order lifecyc
 
 upload → per-order Whop checkout ($15 = 1 reviewer `quick`, $40 = 3 reviewers `full`) → signed `payment.succeeded` webhook → `screening` → AI first read → `paid` (or `needs_reupload` / `held`) → "payment received" Whop message → `recruitOrder` creates and launches **one Terac opportunity per order** via MCP ($6 per reviewer, $18 for three; cap `TERAC_MAX_ORDER_COST_CENTS`) → reviewer opens `/review` from Terac (`review/assigned`, order `in_review`) → submits (`review/submitted`) → redirected to Terac's completion callback → Terac webhook `awaiting_review` → `processFeedback`: Claude grades, approves or rejects via MCP (`review_quality/approved|rejected|needs_attention`), `reviews_done` counts approved → the approval that reaches `review_target` runs `deliverReportIfComplete` (`report/delivered`) → status `done`, `report_json`, `delivered_at` → "results are in" Whop message (`notify/results_sent`) → screenshots deleted (`privacy/deleted`).
 
-Safety net: `POST /api/agent/reconcile` (Bearer `CRON_SECRET`), run every 3 minutes by `node --env-file=.env.local scripts/reconcile-loop.mjs 3` on a laptop (daily Vercel cron as backstop). See README "Recovery" for everything it does.
+Safety net: `POST /api/agent/reconcile` (Bearer `CRON_SECRET`), **self-triggering since 19:38 UTC**: every inbound event kicks it, a heartbeat row in `decisions` deduplicates to one pass per 100 s, and each pass re-kicks itself about every 2 minutes while any order is open (verified: heartbeat advancing on its own across three deploys; `cb3b34c5` adopted its late draft and parked on credits without anyone running anything). Nothing runs on a laptop; the daily Vercel cron and `scripts/reconcile-loop.mjs` only restart the chain. See README "Recovery".
 
 ## Where things stand
 
@@ -37,7 +37,7 @@ Safety net: `POST /api/agent/reconcile` (Bearer `CRON_SECRET`), run every 3 minu
 | `2b29b421` | $40 | women | `paid` | `p2gv41mw4nbj3txvof70nqw4` active | |
 | `98bf976e` | $40 | men | `paid` | `hmysgcnkrntyh51hlshzimzx` active | |
 | `5408387a` | $40 | women | `paid` | `obu3j71z09ihh193mnr44s99` active | First create timed out; job reset by hand (`manual/recruitment_reset`) and relaunched. Orphan draft `afvy1ehep90zbzn05fj1gzto` (old token) can be deleted in Terac; it costs nothing |
-| `cb3b34c5` | $40 | ? | `paid` | none | Create timed out at 19:08; reconcile will adopt a late draft or recruit again after 6 minutes, then wait on credits |
+| `cb3b34c5` | $40 | ? | `paid` | `wsg80l6kd12uezh9ruuo80mx` (draft, adopted 19:47) | Waiting on credits (`retryable`, retried every 15 min; launches by itself once the balance covers $18). Five older orphan drafts for this order exist on Terac from timed-out creates; they cost nothing |
 | two `pending_payment` drafts | | | | | Customers who didn't finish checkout |
 
 Also in Terac: draft `lkqmiqme8nzufrvznvqx2wy2` (integration validation, fake order). Must not be launched; safe to delete.
@@ -47,6 +47,8 @@ Also in Terac: draft `lkqmiqme8nzufrvznvqx2wy2` (integration validation, fake or
 - **Terac `terac_create_opportunity` often exceeds 90 s** (two of six creates today). Recruitment handles it (late-draft adoption in `recruitOrder`, and reconcile's `recoverLostCreate` after 6 minutes), but a 300 s `after()` in the Whop webhook can still be killed mid-create; reconcile covers that too (`recruitment/stuck` after 10 min).
 - **Rejected reviews:** Terac docs say it "may recruit a replacement"; the slot is freed locally (`assign_terac_review` ignores rejected rows) so the next Terac reviewer fills it. If Terac doesn't send another reviewer, the order stalls at N-1; reconcile flags nothing for this yet. Fallback: a human bumps `num_participants` or launches a new opportunity (spends credits; Haris's call).
 - **`review_quality/needs_attention`** holds are surfaced by reconcile (`review_quality/still_held`, hourly) but need a human to inspect `feedback_quality_jobs` and either approve/reject in the Terac dashboard or reset the job.
+- **`terac_list_opportunities` omits `internal_title`**; anything matching an order to a Terac opportunity must `terac_get_opportunity` each candidate (fixed in `recoverLostCreate`; before the fix it created a new draft every cycle).
+- **Someone else's in-progress change** landed in commit `d0f0c7e` by accident (it was uncommitted in the shared checkout): `/api/orders/[id]` now returns approved reviews while an order is in progress and `components/order-status.tsx` shows them. It typechecks and only shows `status = approved` rows; review it if it wasn't meant to ship.
 - **Whop messages to the business owner fail** ("recipient is the bot owner"); expected for Haris's own orders.
 - Terac's `terac_get_submissions` list and `submission_stats` lagged behind `terac_get_submission` for the in-progress reviewer; reconcile checks pending local reviews individually for that reason.
 - `/start` (marketplace buyers) is a placeholder; see checklist "Marketplace" for the proposed design.

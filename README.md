@@ -38,11 +38,7 @@ Order status: `pending_payment → screening → paid → in_review → done` (p
 
 Terac webhooks are the fast path. `POST /api/agent/reconcile` (header `Authorization: Bearer $CRON_SECRET`) is the path that always works: it retries recruitment for paid orders, polls Terac for finished submissions the webhook missed and grades them, retries interrupted quality checks, frees slots whose reviewer abandoned, re-processes unprocessed webhook events, delivers complete reports, deletes leftover screenshots, and logs `credits/low` when the Terac balance can't cover another order. It never launches anything outside the normal paid-order flow and never moves money.
 
-Run it every few minutes from a laptop while Vercel Hobby crons only run daily:
-
-```bash
-node --env-file=.env.local scripts/reconcile-loop.mjs 3
-```
+**It runs itself.** Vercel Hobby crons only run daily, so the system is its own clock: every inbound event (Whop webhook, Terac webhook, reviewer start/submit, a customer polling their order page, the dashboard) calls `kickReconcile()` in `after()`, which POSTs `/api/agent/reconcile?async=1`. That route claims a heartbeat (one `decisions` row, step `reconcile`/choice `heartbeat`, updated in place with a conditional update so exactly one caller wins per 100 s), answers 202, runs the pass in `after()`, and, while any order is `paid`/`in_review` or any event or retry is open, sleeps and kicks itself again about every two minutes. Passes that moved something log `reconcile/summary`; failures log `reconcile/failed`. The daily cron (`GET`) and `scripts/reconcile-loop.mjs` just restart the chain; nothing has to run on a laptop. Without `?async=1` the route runs inline and returns the full summary (debugging).
 
 Other protected routes: `POST /api/agent/order-paid {orderId}` (retry one order's recruitment), `POST /api/agent/review-feedback {submissionId}` (re-run one quality check), `POST /api/agent/deliver-reports` (deliver every complete order).
 

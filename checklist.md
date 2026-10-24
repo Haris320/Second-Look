@@ -1,6 +1,6 @@
 # checklist.md: Second Look build order
 
-> **Status (2026-10-24, 19:15 UTC):** the loop is built end to end and live. Pricing is $15 for 1 reviewer (`quick`) or $40 for 3 (`full`), up to 10 screenshots. Recruitment creates **one Terac opportunity per order** (docs/terac-recruitment.md), not shared panels; anything below about "panels" is historical. Current state, order table and open issues: `docs/handoff.md`. Recovery: `POST /api/agent/reconcile` every 3 minutes (README).
+> **Status (2026-10-24, 19:15 UTC):** the loop is built end to end and live. Pricing is $15 for 1 reviewer (`quick`) or $40 for 3 (`full`), up to 10 screenshots. Recruitment creates **one Terac opportunity per order** (docs/terac-recruitment.md), not shared panels; anything below about "panels" is historical. Current state, order table and open issues: `docs/handoff.md`. Recovery: `/api/agent/reconcile` is self-triggering (kicked by every inbound event, heartbeat-deduplicated, re-kicks itself every ~2 minutes while orders are open; README "Recovery").
 
 Turns `plan.md` into steps. **A** = backend/agent, **B** = frontend/sales, **You** = a human-only task (accounts, keys, asking staff).
 Each step has a **Check** that proves it works. Don't start the next step on the same track until its check passes.
@@ -152,7 +152,7 @@ Written once by partner's code, read by `/order/[id]`. Photos are referred to by
 
 - [ ] **Event-driven instead of a 1-minute cron:** on review submit, run (via `after()`) the rule checks (all answered, ≥60 s) plus one Claude call for specificity and abuse → approve or reject through Terac → bump `reviews_done` → if the target is reached, generate the report (Claude summarizes **only** real answers; prompt rewrites labelled as AI) → status `done` → **delete the order's screenshots**. Every step goes to `decisions`.
 - [ ] Panels: when the last waiting order is assigned, pause the panels; when a paid order arrives (webhook), resume them. Claude checks the Terac balance after each approval and pauses sales (hides checkout) when credits can't cover the open orders.
-- [ ] Keep `api/agent/tick` as a safety net (retry stuck reviews, pause/resume panels if they drift), protected by `CRON_SECRET`, called from a laptop loop or an external pinger.
+- [x] Safety net: `api/agent/reconcile`, protected by `CRON_SECRET`, self-kicking from inbound events plus a heartbeat (no laptop loop or external pinger needed).
   - **Check:** a lazy test review ("looks good") gets rejected with a logged reason; a good one gets approved; at the target the report renders on `/order/[id]`.
 
 ## Step 7: launch panels (A, after Steps 2 and 5)
