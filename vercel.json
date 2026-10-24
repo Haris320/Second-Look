@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/referrals", "schedule": "0 12 * * *" },
-    { "path": "/api/agent/reconcile", "schedule": "30 12 * * *" }
+    { "path": "/api/agent/reconcile", "schedule": "30 12 * * *" },
+    { "path": "/api/cron/x-marketing", "schedule": "0 16 * * *" }
   ]
 }
