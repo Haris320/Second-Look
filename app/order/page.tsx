@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { UploadForm } from "@/components/upload-form";
+import { isTier } from "@/lib/tiers";
 export const metadata = { title: "Upload your profile" };
-export default function OrderPage() {
-  return (
-    <main id="main" className="wrap order-wrap">
-      <UploadForm />
-    </main>
-  );
+async function SelectedPackage({ searchParams }: { searchParams: Promise<{ tier?: string }> }) {
+  const { tier } = await searchParams;
+  return <UploadForm initialTier={isTier(tier) ? tier : "quick"} />;
+}
+export default function OrderPage({ searchParams }: { searchParams: Promise<{ tier?: string }> }) {
+  return <main id="main" className="wrap order-wrap"><Suspense fallback={<p>Loading your review options…</p>}><SelectedPackage searchParams={searchParams} /></Suspense></main>;
 }

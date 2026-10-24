@@ -15,7 +15,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { audienceLabel } from "@/lib/audience";
-import { TIERS, type Tier } from "@/lib/tiers";
+import { TIERS, expectedOrderCents, type Tier } from "@/lib/tiers";
 import type { FirstRead } from "@/lib/first-read";
 import { ReportContent, type ProfileReport } from "./report-content";
 import { ReuploadForm } from "./reupload-form";
@@ -284,7 +284,7 @@ export function OrderStatus({ id }: { id: string }) {
             </div>
             <div>
               <dt>Reviewers</dt>
-              <dd>{order.review_target} people</dd>
+              <dd>{order.review_target} {order.review_target === 1 ? "person" : "people"}</dd>
             </div>
             <div>
               <dt>Audience</dt>
@@ -299,8 +299,8 @@ export function OrderStatus({ id }: { id: string }) {
               <dd>
                 {order.amount_cents !== null
                   ? `$${(order.amount_cents / 100).toFixed(2)}`
-                  : order.review_target === 3
-                    ? "$15"
+                  : expectedOrderCents(order.tier, order.review_target) !== null
+                    ? `$${expectedOrderCents(order.tier, order.review_target)! / 100}`
                     : "Previous offer"}
               </dd>
             </div>

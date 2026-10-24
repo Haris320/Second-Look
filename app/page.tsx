@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
-import { REVIEW_OFFER } from "@/lib/tiers";
+import { TIERS } from "@/lib/tiers";
 import { ReportContent, type AgentReport } from "@/components/report-content";
 
 // Paste a real delivered report_json here (with the customer's permission) to show the sample section.
@@ -27,7 +27,7 @@ export default function Home() {
             </Link>
           </div>
           <p className="editorial-small">
-            $15 · 3 reviewers · Results by tonight
+            $15 for one reviewer · $40 for three
           </p>
         </div>
         <aside className="review-note">
@@ -87,11 +87,11 @@ export default function Home() {
             ],
             [
               "Choose who reviews it",
-              "Pick women or men aged 21–35 in the US, then pay $15 once through Whop.",
+              "Pick women or men aged 21–35 in the US, then choose one reviewer for $15 or three for $40. Pay once through Whop.",
             ],
             [
               "Real people review it",
-              "Three reviewers each rate your photos, react to your prompts, and suggest one change, independently.",
+              "Your reviewer gives specific feedback on your photos and prompts. Choose three for independent perspectives.",
             ],
             [
               "Get your report by tonight",
@@ -122,16 +122,16 @@ export default function Home() {
       <section className="wrap editorial-section" id="pricing">
         <div className="editorial-section-heading">
           <span className="section-number">02 / PICK A REVIEW</span>
-          <h2>One review. One price.</h2>
+          <h2>One perspective, or three.</h2>
           <p>One payment. No subscription or ongoing commitment.</p>
         </div>
-        <div className="single-price">
+        {Object.entries(TIERS).map(([tier, offer]) => <div className="single-price" key={tier}>
           <div className="single-price-amount">
-            ${REVIEW_OFFER.priceUsd}
+            ${offer.priceUsd}
             <span>one time</span>
           </div>
           <div>
-            <h3>{REVIEW_OFFER.reviews} people review your profile.</h3>
+            <h3>{offer.reviews === 1 ? "One person reviews your profile." : "Three independent perspectives."}</h3>
             <ul>
               {[
                 "Up to 10 screenshots",
@@ -145,10 +145,10 @@ export default function Home() {
               ))}
             </ul>
           </div>
-          <Link className="button button-dark" href="/order">
+          <Link className="button button-dark" href={`/order?tier=${tier}`}>
             Get my profile reviewed <ArrowRight size={16} />
           </Link>
-        </div>
+        </div>)}
       </section>
       <section className="wrap editorial-section editorial-faq">
         <div className="editorial-section-heading">
@@ -163,7 +163,7 @@ export default function Home() {
           {[
             [
               "Who’s looking at my profile?",
-              "Human reviewers recruited through Terac. You choose women or men aged 21–35 in the United States. You’ll get several individual opinions, not one person speaking for everyone.",
+              "Human reviewers recruited through Terac. You choose women or men aged 21–35 in the United States. Choose one reviewer or three independent reviewers.",
             ],
             [
               "How fast will I get my results?",
@@ -183,7 +183,7 @@ export default function Home() {
             ],
             [
               "Will this get me more matches?",
-              "We can’t promise that. What we can give you is a few outside perspectives and specific things to try.",
+              "We can’t promise that. What we can give you is an outside perspective and specific things to try.",
             ],
           ].map(([q, a]) => (
             <details key={q}>

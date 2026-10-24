@@ -1,7 +1,7 @@
 import { db } from "@/lib/supabase";
 import { hasAccess, sameOrigin } from "@/lib/order-access";
 import { verifyUploads } from "@/lib/verify-uploads";
-import { REVIEW_OFFER, type Tier } from "@/lib/tiers";
+import { matchesCurrentPackage, type Tier } from "@/lib/tiers";
 
 export async function POST(
   request: Request,
@@ -34,11 +34,11 @@ export async function POST(
       { error: "This order is not awaiting payment." },
       { status: 409 },
     );
-  if (order.tier !== "quick" || order.review_target !== REVIEW_OFFER.reviews) {
+  if (!matchesCurrentPackage(order.tier, order.review_target)) {
     return Response.json(
       {
         error:
-          "This draft uses an older review option. Please create a new $15 order for 3 reviewers.",
+          "This draft uses an older review option. Please create a new order and select one or three reviewers.",
       },
       { status: 409 },
     );

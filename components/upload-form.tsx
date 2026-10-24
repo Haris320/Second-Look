@@ -20,14 +20,16 @@ import {
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { IMAGE_TYPES, MAX_SCREENSHOTS, validateFiles } from "@/lib/uploads";
-import { AUDIENCES, REVIEW_OFFER, type Audience } from "@/lib/tiers";
+import { AUDIENCES, TIERS, type Tier, type Audience } from "@/lib/tiers";
 type Shot = { id: string; file: File; url: string };
 type Prepared = {
   orderId: string;
   uploads: { path: string; token: string }[];
   storageUrl: string;
 };
-export function UploadForm() {
+export function UploadForm({ initialTier = "quick" }: { initialTier?: Tier }) {
+  const [tier, setTier] = useState<Tier>(initialTier);
+  const offer = TIERS[tier];
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const urls = useRef(new Set<string>());
@@ -129,6 +131,7 @@ export function UploadForm() {
           body: JSON.stringify({
             email,
             audience,
+            tier,
             ownProfile,
             adult,
             files: shots.map((s) => ({
@@ -424,10 +427,12 @@ export function UploadForm() {
                 through Terac. Every review in your report comes from one of
                 them.
               </p>
-              <div className="standard-offer">
-                <strong>3 independent reviewers</strong>
-                <span>$15, one time</span>
-              </div>
+              <label className="field-label" htmlFor="package">Choose your review</label>
+              <select id="package" value={tier} onChange={e => setTier(e.target.value as Tier)}>
+                <option value="quick">One reviewer — $15</option>
+                <option value="full">Three reviewers — $40</option>
+              </select>
+              <p className="field-help">Both include up to 10 screenshots and feedback on photos and prompts. One payment, no subscription.</p>
               <div className="consents">
                 <label>
                   <input
@@ -507,7 +512,7 @@ export function UploadForm() {
         <div className="summary-card">
           <span className="mini-tag">YOUR SECOND LOOK</span>
           <h3>
-            A few honest opinions
+            An outside perspective
             <br />
             can help.
           </h3>
@@ -530,7 +535,7 @@ export function UploadForm() {
               <Users size={18} />
               <div>
                 <strong>Independent reviewers</strong>
-                <span>{REVIEW_OFFER.reviews} independent human reviewers</span>
+                <span>{offer.reviews} human {offer.reviews === 1 ? "reviewer" : "reviewers"}</span>
               </div>
             </li>
             <li>
@@ -549,9 +554,9 @@ export function UploadForm() {
             </li>
           </ul>
           <div className="summary-total">
-            <span>{REVIEW_OFFER.name}</span>
+            <span>{offer.name}</span>
             <strong>
-              ${REVIEW_OFFER.priceUsd}
+              ${offer.priceUsd}
               <small> one time</small>
             </strong>
           </div>

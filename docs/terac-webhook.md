@@ -15,7 +15,7 @@ Uses Terac's documented literal-secret HMAC-SHA256 over timestamp + raw body, co
 
 A successful event delivery means the event is durably stored. The database transaction deduplicates `event_id` and updates `reviews.terac_status` only when the event is newer. Events arriving before review assignment stay in the inbox. RLS denies browser access. No customer profile images are stored in the inbox.
 
-**Worker integration still required:** this checkout has no reviewer quality/report worker. It must consume `terac_webhook_events` where `processed_at is null`, match `submission_id` to a locally assigned review, run quality checks on saved answers, approve/reject through Terac, and generate the report at three approved reviews. Mark processed only after success. Make those actions idempotent by submission ID because status-change and approval events may describe the same transition. The handler deliberately does not change `reviews.status`, increment `reviews_done`, pay reviewers, or mark an order delivered merely because Terac reports completion. Events remain pending until that worker is connected; there is no automatic worker wakeup yet.
+**Feedback worker:** `awaiting_review`, `approved`, and `rejected` events now invoke the AI feedback-quality worker after durable storage, including duplicate deliveries that need retry. See `feedback-quality.md` for the additional migration and activation flag. Intermediate status events are marked processed without AI calls. Errors return 503 so Terac retries; uncertain decisions remain pending with a needs_attention audit entry. Final report generation is separate and not yet implemented.
 
 Source: https://terac.com/docs/developers/guides/webhooks
 

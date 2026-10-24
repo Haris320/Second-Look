@@ -1,6 +1,6 @@
 # checklist.md: Second Look build order
 
-> Pricing update (2026-10-24): one standard $15 review with 3 reviewers and up to 10 screenshots. This supersedes tiered pricing and review counts below. New orders retain the `quick` database value only for schema compatibility.
+> Pricing update (2026-10-24): $15 for 1 reviewer (`quick`) or $40 for 3 reviewers (`full`), both with up to 10 screenshots. This supersedes older prices/counts below. Existing paid $15/3-review orders keep their original review target. Recruitment now creates one opportunity per order; see docs/terac-recruitment.md.
 
 Turns `plan.md` into steps. **A** = backend/agent, **B** = frontend/sales, **You** = a human-only task (accounts, keys, asking staff).
 Each step has a **Check** that proves it works. Don't start the next step on the same track until its check passes.

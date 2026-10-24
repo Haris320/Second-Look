@@ -8,16 +8,14 @@ export const IMAGE_TYPES: Record<string, string> = {
   "image/webp": "webp",
 };
 
-// Hands a paid order to the agent (partner's app/api/agent/order-paid → onOrderPaid). Call it inside after().
-// A 404 means the agent side isn't deployed yet, which is fine: its tick picks the order up.
+// Runs inside the payment/reupload after() callback, after screening passes.
+// Direct invocation avoids an extra HTTP hop, missing CRON_SECRET, and Vercel
+// deployment-protection failures. The protected route is for recovery/backlog.
 export async function notifyOrderPaid(orderId: string) {
-  const res = await fetch(`${process.env.PUBLIC_BASE_URL}/api/agent/order-paid`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CRON_SECRET}` },
-    body: JSON.stringify({ orderId }),
-  }).catch((err) => {
-    console.error("order-paid hook failed", err);
-    return null;
-  });
-  if (res && !res.ok && res.status !== 404) console.error("order-paid hook returned", res.status);
+  try {
+    const { recruitOrder } = await import("./recruitment");
+    await recruitOrder(orderId);
+  } catch {
+    console.error("Recruitment needs retry for order", orderId);
+  }
 }

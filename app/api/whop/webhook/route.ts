@@ -3,7 +3,7 @@ import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
 import { whop, whopWebhookSecret, toCents } from "@/lib/whop";
-import { TIERS, tierForAmount } from "@/lib/tiers";
+import { TIERS, tierForAmount, expectedOrderCents } from "@/lib/tiers";
 import { runFirstRead } from "@/lib/first-read";
 
 type WhopEvent = { type?: string; action?: string; data?: { id?: string } };
@@ -39,6 +39,14 @@ export async function POST(request: Request) {
   const orderId = typeof payment.metadata?.order_id === "string" ? payment.metadata.order_id : null;
 
   if (orderId) {
+    const { data: selected, error: selectedError } = await db.from("orders")
+      .select("tier,review_target").eq("id", orderId).single();
+    if (selectedError || !selected) return new Response("Order unavailable", { status: 503 });
+    const expected = expectedOrderCents(selected.tier, selected.review_target);
+    if (expected === null || amountCents !== expected) {
+      await logDecision(orderId, "payment", "amount_mismatch", `Expected ${expected} cents, received ${amountCents}; payment needs reconciliation`);
+      return new Response("Payment amount does not match order");
+    }
     // Flow A: the order already exists with screenshots. The status guard makes webhook retries no-ops.
     // It waits in 'screening' until the AI first read moves it to 'paid' (sent to reviewers) or 'held'.
     const { data } = await db

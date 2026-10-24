@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
 import { validateFiles, type UploadManifest } from "@/lib/uploads";
-import { REVIEW_OFFER, isAudience } from "@/lib/tiers";
+import { TIERS, isTier, isAudience } from "@/lib/tiers";
 import { grantAccess, sameOrigin, privateHeaders } from "@/lib/order-access";
 import { issueOrderLink } from "@/lib/order-links";
 
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   }
   if (!body || typeof body !== "object" || Array.isArray(body))
     return Response.json({ error: "Invalid request." }, { status: 400 });
-  const { email, audience, ownProfile, adult, files } = body;
+  const { email, audience, tier, ownProfile, adult, files } = body;
+  if (!isTier(tier)) return Response.json({ error: "Choose a review package." }, { status: 400 });
   if (!isAudience(audience))
     return Response.json(
       { error: "Choose who should review your profile." },
@@ -76,8 +77,8 @@ export async function POST(request: Request) {
       id,
       email: normalizedEmail,
       audience,
-      tier: "quick",
-      review_target: REVIEW_OFFER.reviews,
+      tier,
+      review_target: TIERS[tier].reviews,
       status: "pending_payment",
     });
     if (orderError) throw orderError;
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
       id,
       "order",
       "created",
-      "Standard $15 order with 3 reviewers; awaiting payment",
+      `$${TIERS[tier].priceUsd} order with ${TIERS[tier].reviews} reviewer(s); awaiting payment`,
     );
     await grantAccess(id);
     await issueOrderLink(id);
