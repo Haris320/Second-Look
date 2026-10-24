@@ -7,6 +7,7 @@ import { logDecision } from "@/lib/log";
 import { whop, whopWebhookSecret, whopBizId, toCents } from "@/lib/whop";
 import { TIERS, tierForAmount, expectedOrderCents } from "@/lib/tiers";
 import { runFirstRead } from "@/lib/first-read";
+import { messageBuyer } from "@/lib/notify";
 
 type WhopEvent = { type?: string; action?: string; data?: { id?: string } };
 
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       .select("id");
     if (data?.length) {
       await logDecision(orderId, "payment", "paid", `Whop payment ${payment.id} confirmed`);
-      after(() => runFirstRead(orderId));
+      after(() => Promise.all([runFirstRead(orderId), messageBuyer(orderId, "paid")]));
     }
     await recordReferralPurchase(payment,orderId);
     return new Response("ok");
