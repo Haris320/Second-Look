@@ -29,8 +29,7 @@ export function PrivateLink({ link }: { link: string }) {
         <LockKeyhole size={20} /> Save this link to see your results
       </h2>
       <p style={{ marginTop: 8, fontSize: 14 }}>
-        Bookmark it or copy it somewhere safe. It opens your results from any browser or device. Keep it private:
-        anyone with the link can see your order.
+        Bookmark it or copy it somewhere safe. It opens your results from any browser or device.
       </p>
       <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
         <input
@@ -44,6 +43,9 @@ export function PrivateLink({ link }: { link: string }) {
           {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? "Copied" : "Copy link"}
         </button>
       </div>
+      <p style={{ marginTop: 10, fontSize: 13 }}>
+        This link is private. Anyone with it can see your results, so don’t share it.
+      </p>
     </section>
   );
 }
