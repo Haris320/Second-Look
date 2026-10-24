@@ -18,9 +18,10 @@ const rows={
  referral_profiles:[{id:'profile_a',scope:'production:biz',whop_user_id:'user_0',code:'a'.repeat(32)}],
  referral_rewards:[{id:'reward',profile_id:'profile_a',state:'pending',order_id:B,payment_id:'private-payment',buyer_id:'user_1'}],
  decisions:[],
+ reviews:[],
 };
 const db={from(table){reads.push(table);let columns='*',head=false,filters=[];
- const q={select(c,opts={}){columns=c;head=opts.head;return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},in(k,v){filters.push(r=>v.includes(r[k]));return q;},like(){return q;},gt(){return q;},order(){return q;},
+ const q={select(c,opts={}){columns=c;head=opts.head;return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},in(k,v){filters.push(r=>v.includes(r[k]));return q;},like(){return q;},gt(){return q;},order(){return q;},limit(){return q;},
  single:async()=>result(true),maybeSingle:async()=>result(true),then(resolve,reject){return Promise.resolve(result(false)).then(resolve,reject);}};
  function result(single){const selected=rows[table].filter(r=>filters.every(f=>f(r)));const projected=selected.map(r=>Object.fromEntries(Object.entries(r).filter(([k])=>columns==='*'||columns.split(',').includes(k))));return {error:null,data:head?null:single?projected[0]??null:projected,count:selected.length};}return q;},
  storage:{from:()=>({createSignedUrl:async(path,age)=>{signed.push({path,age});return {data:{signedUrl:`https://storage.test/${path}?signature=private`}};}})},
@@ -37,6 +38,7 @@ const {referralSummary}=await import(referralsUrl);
 const route=await import(compile('../app/api/orders/[id]/route.ts',{
  '@/lib/supabase':dbUrl,'@/lib/order-access':accessUrl,'@/lib/order-links':linksUrl,'@/lib/referrals':referralsUrl,
  '@/lib/reconcile-kick':url('export async function kickReconcile(){}'),'next/server':url('export function after(fn){fn()}'),
+ '@/lib/reviewer-access':url('export function parseReviewAnswers(v){return v}'),
 }));
 const guardDependencies={
  '@/lib/supabase':dbUrl,'@/lib/order-access':accessUrl,
