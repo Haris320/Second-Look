@@ -8,6 +8,7 @@ import { whop, whopWebhookSecret, whopBizId, toCents } from "@/lib/whop";
 import { TIERS, tierForAmount, expectedOrderCents } from "@/lib/tiers";
 import { runFirstRead } from "@/lib/first-read";
 import { messageBuyer } from "@/lib/notify";
+import { kickReconcile } from "@/lib/reconcile-kick";
 
 type WhopEvent = { type?: string; action?: string; data?: { id?: string } };
 
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
     if (data?.length) {
       await logDecision(orderId, "payment", "paid", `Whop payment ${payment.id} confirmed`);
       after(() => Promise.all([runFirstRead(orderId), messageBuyer(orderId, "paid")]));
+      // A new paid order (re)starts the agent's own reconcile clock.
+      after(() => kickReconcile("whop_webhook"));
     }
     await recordReferralPurchase(payment,orderId);
     return new Response("ok");

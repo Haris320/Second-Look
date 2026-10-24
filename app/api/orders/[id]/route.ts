@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { referralSummary } from "@/lib/referrals";
+import { kickReconcile } from "@/lib/reconcile-kick";
 import { db } from "@/lib/supabase";
 import { hasAccess, privateHeaders, sameOrigin } from "@/lib/order-access";
 import { currentOrderLink, tooManyResponse, tooManyWrongKeys } from "@/lib/order-links";
@@ -57,6 +59,8 @@ export async function GET(
       process.env.PUBLIC_BASE_URL,
   );
   const referral = await referralSummary(id);
+  // A customer waiting on their order page keeps the agent's reconcile clock ticking (deduplicated server-side).
+  if (["paid", "in_review"].includes(order.status)) after(() => kickReconcile("order_poll"));
   return Response.json(
     { order, screenshots: images, checkoutReady, privateLink, referral },
     { headers: privateHeaders },

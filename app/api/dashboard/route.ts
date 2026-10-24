@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { dashboardAccess } from "@/lib/dashboard-access";
+import { kickReconcile } from "@/lib/reconcile-kick";
 import { db } from "@/lib/supabase";
 import { privateHeaders } from "@/lib/order-access";
 export async function GET() {
@@ -18,6 +20,7 @@ export async function GET() {
     db
       .from("decisions")
       .select("id,order_id,step,choice,reason,created_at")
+      .neq("choice", "heartbeat")
       .order("created_at", { ascending: false })
       .limit(60),
     // Team test purchases are marked with a logged manual decision, so revenue and counts exclude them.
@@ -29,6 +32,8 @@ export async function GET() {
       { status: 503, headers: privateHeaders },
     );
   const testIds = new Set((tests.data ?? []).map((t) => t.order_id));
+  // Someone watching the dashboard keeps the agent's reconcile clock ticking (deduplicated server-side).
+  after(() => kickReconcile("dashboard"));
   return Response.json(
     {
       orders: (orders.data ?? []).map((o) => ({ ...o, is_test: testIds.has(o.id) })),

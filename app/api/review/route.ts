@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
+import { kickReconcile } from "@/lib/reconcile-kick";
 import { parseReviewAnswers, verifyAssignedReviewer, verifyReviewer } from "@/lib/reviewer-access";
 
 export async function POST(request: Request) {
@@ -15,6 +17,8 @@ export async function POST(request: Request) {
       const { data: saved, error } = await db.rpc("submit_terac_review", { p_order_id: access.orderId, p_submission: access.submissionId, p_answers: answers });
       if (error) return Response.json({ error: "Could not submit. Spend at least 60 seconds reviewing, then try again." }, { status: 409 });
       if (saved === true) await logDecision(access.orderId, "review", "submitted", `Answers saved for Terac submission ${access.submissionId}; reviewer sent back to Terac, quality check runs when Terac reports awaiting_review`);
+      // If Terac's awaiting_review webhook never arrives, the reconcile pass finds and grades this submission.
+      after(() => kickReconcile("review_submit"));
       return Response.json({ submitted: true, callbackUrl: callback(access.submissionId) });
     } catch {
       return Response.json({ error: "Cannot access this review. Open your assigned task from Terac and try again." }, { status: 403 });

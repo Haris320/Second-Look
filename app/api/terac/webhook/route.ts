@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { processFeedbackEvent } from "@/lib/feedback-quality";
+import { kickReconcile } from "@/lib/reconcile-kick";
 import { db } from "@/lib/supabase";
 import { receiveTeracWebhook } from "@/lib/terac-webhook";
 
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
     // event is stored and do the work after the response. If it fails, processed_at stays null and
     // /api/agent/reconcile picks the event up. Duplicate deliveries also re-run processing (lease-protected).
     after(() => processFeedbackEvent(event).catch(e => console.error("Terac event processing failed", event.event_id, e)));
+    after(() => kickReconcile("terac_webhook"));
     return data === true;
   });
 }

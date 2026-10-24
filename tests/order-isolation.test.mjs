@@ -36,6 +36,7 @@ const referralsUrl=compile('../lib/referrals.ts',{'next/headers':cookiesUrl,'./s
 const {referralSummary}=await import(referralsUrl);
 const route=await import(compile('../app/api/orders/[id]/route.ts',{
  '@/lib/supabase':dbUrl,'@/lib/order-access':accessUrl,'@/lib/order-links':linksUrl,'@/lib/referrals':referralsUrl,
+ '@/lib/reconcile-kick':url('export async function kickReconcile(){}'),'next/server':url('export function after(fn){fn()}'),
 }));
 const guardDependencies={
  '@/lib/supabase':dbUrl,'@/lib/order-access':accessUrl,
@@ -52,7 +53,8 @@ const complete=await import(compile('../app/api/orders/[id]/complete/route.ts',g
 const reupload=await import(compile('../app/api/orders/[id]/reupload/route.ts',guardDependencies));
 const dashboardAccessUrl=compile('../lib/dashboard-access.ts',{'next/headers':cookiesUrl});
 const dashboardAccess=await import(dashboardAccessUrl);
-const dashboard=await import(compile('../app/api/dashboard/route.ts',{'@/lib/supabase':dbUrl,'@/lib/dashboard-access':dashboardAccessUrl,'@/lib/order-access':accessUrl}));
+const dashboard=await import(compile('../app/api/dashboard/route.ts',{'@/lib/supabase':dbUrl,'@/lib/dashboard-access':dashboardAccessUrl,'@/lib/order-access':accessUrl,
+ '@/lib/reconcile-kick':url('export async function kickReconcile(){}'),'next/server':url('export function after(fn){fn()}')}));
 function reset(){
  jar=new Map();reads=[];signed=[];
  process.env.ORDER_SESSION_SECRET='test-session-secret';process.env.ORDER_LINK_SECRET='test-link-secret';process.env.DASHBOARD_PASSWORD='test-dashboard-secret';process.env.PUBLIC_BASE_URL='https://second-look.test';process.env.REFERRALS_ENABLED='false';process.env.WHOP_ENVIRONMENT='production';
