@@ -31,7 +31,7 @@ Every paid order runs through these steps with no one on the team touching it. E
 | # | Step | Owner | Status |
 |---|---|---|---|
 | 1 | Customer uploads and pays on a per-order Whop checkout. The webhook verifies the signature, re-fetches the payment, and marks the order `screening` [`payment/paid`] | Haris | Live (marks `paid` until step 2 deploys) |
-| 2 | **AI first read:** Claude checks the screenshots are a dating profile, with nothing explicit and no minor. Pass → `paid`, instant feedback on `/order/[id]` labeled as AI [`first_read/passed`]. Fail, or the check itself fails → `held`, reason in `hold_reason`, no reviewer sees it [`first_read/held`] | Haris | Built; waits on the schema SQL, then deploy |
+| 2 | **AI first read:** Claude checks the screenshots are a dating profile, with nothing explicit and no minor. Pass → `paid`, instant feedback on `/order/[id]` labeled as AI [`first_read/passed`]. Not a dating profile or screenshots missing → `needs_reupload`: the customer re-uploads on `/order/[id]` and the read runs again [`first_read/needs_reupload`, `reupload/screening`]. Explicit, looks under 18, or the check errors twice → `held` for refund [`first_read/retry`, `first_read/held`]. No reviewer sees anything but `paid` | Haris | Built; waits on the schema SQL, then deploy |
 | 3 | Hand the passed order to the agent: `POST /api/agent/order-paid` → `onOrderPaid(orderId)` | Haris calls it, partner owns the route | Partner (mock mode) |
 | 4 | **Route to the right panel:** `orders.audience` (`women_21_35_us` / `men_21_35_us`) picks the Terac panel; the reviewer page assigns the oldest `paid` order for its audience, `paid → in_review` [`review/assigned`] | Partner | Partner (mock mode) |
 | 5 | **Panels on and off:** resume a panel when paid orders wait for its audience, pause it when none do [`panel/resumed`, `panel/paused`] | Partner | Partner (mock mode) |
@@ -40,7 +40,7 @@ Every paid order runs through these steps with no one on the team touching it. E
 | 8 | **Credits:** after each approval, check the Terac balance. If it can't cover open orders, call `setSalesOpen(false)`, which hides Whop products and blocks new checkouts; call `setSalesOpen(true)` when it can [`sales/paused`, `sales/opened`] | Partner calls it; Haris built `setSalesOpen` | `setSalesOpen` tested in sandbox; the call is partner's |
 | 9 | **Report:** at `review_target`, Claude builds `report_json` from approved reviews only (AI rewrites labeled); status `done`, `delivered_at` set [`report/delivered`] | Partner writes it, Haris's page renders it | Page live; writer is partner's |
 | 10 | **Delete screenshots:** storage files and `screenshots` rows, right after delivery [`privacy/deleted`] | Partner | Partner (mock mode) |
-| 11 | Held orders: refund in the Whop dashboard. The agent never moves money, so this is the one human step, and only for orders that fail the check | Haris (human) | Manual by design |
+| 11 | Held orders (explicit, under 18, or check errored twice): refund in the Whop dashboard. The agent never moves money, so this is the one human step | Haris (human) | Manual by design |
 
 ### Proposed `report_json` shape (agree before building)
 

@@ -26,8 +26,8 @@ export async function GET(
       { error: "Order not found." },
       { status: 404, headers: privateHeaders },
     );
-  // A held order's first read describes why it was held; that stays on the team dashboard.
-  if (data.status === "held") data.first_read_json = null;
+  // A held or rejected first read describes why; that stays on the team dashboard.
+  if (data.status === "held" || data.status === "needs_reupload") data.first_read_json = null;
   const { data: screenshots } = await db
     .from("screenshots")
     .select("id,storage_path,position")

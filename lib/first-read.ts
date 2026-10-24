@@ -62,23 +62,25 @@ Speak to the customer as "you". Be kind but honest. Comment on choices they cont
 const anthropic = new Anthropic();
 
 // Reads the order's screenshots with Claude. No database writes, so it is safe to try on any order.
+// `missing` = the customer needs to upload again; `failure` = the check itself broke.
 export async function readProfile(
   orderId: string,
-): Promise<{ read: FirstRead } | { failure: string }> {
+): Promise<{ read: FirstRead } | { missing: string } | { failure: string }> {
   const { data: shots } = await db
     .from("screenshots")
     .select("storage_path,position")
     .eq("order_id", orderId)
     .order("position");
-  if (!shots?.length) return { failure: "No screenshots found for this order" };
+  if (!shots?.length) return { missing: "No screenshots found for this order" };
   const { data: signed, error } = await db.storage
     .from("screenshots")
     .createSignedUrls(
       shots.map((s) => s.storage_path),
       600,
     );
-  const urls = signed?.map((s) => s.signedUrl);
-  if (error || !urls || urls.some((url) => !url)) return { failure: "Could not sign the screenshot URLs" };
+  if (error || !signed) return { failure: "Could not sign the screenshot URLs" };
+  const urls = signed.map((s) => s.signedUrl);
+  if (urls.some((url) => !url)) return { missing: "Some screenshot files are missing from storage" };
   const content: Anthropic.ContentBlockParam[] = shots.flatMap((s, i) => [
     { type: "text" as const, text: `Screenshot ${s.position}` },
     { type: "image" as const, source: { type: "url" as const, url: urls[i]! } },
@@ -101,29 +103,43 @@ export async function readProfile(
   }
 }
 
-// Runs on every newly paid order (status 'screening'). A safe profile moves to 'paid' and goes to the reviewers;
-// anything else, including a failed check, is held so no reviewer sees it. Haris refunds held orders in Whop.
+// Runs on every newly paid or re-uploaded order (status 'screening'):
+// - safe dating profile → 'paid', handed to the reviewers;
+// - not a dating profile, or screenshots missing → 'needs_reupload', the customer re-uploads on /order/[id];
+// - explicit, someone who looks under 18, or the check errors twice → 'held', Haris refunds in Whop.
 export async function runFirstRead(orderId: string) {
-  const result = await readProfile(orderId);
+  let result = await readProfile(orderId);
+  if ("failure" in result) {
+    await logDecision(orderId, "first_read", "retry", `${result.failure}; trying once more`);
+    result = await readProfile(orderId);
+  }
   const read = "read" in result ? result.read : null;
-  const passed = !!read && read.is_dating_profile && !read.explicit_content && !read.appears_under_18;
-  const reason = passed
-    ? "Screenshots are a dating profile with nothing explicit; sent to reviewers"
-    : "failure" in result
-      ? `${result.failure}; held so no reviewer sees unchecked screenshots`
-      : `Held: ${read!.hold_reason || "failed the safety check"}`;
+  let status: "paid" | "needs_reupload" | "held";
+  let reason: string;
+  if ("failure" in result) {
+    status = "held";
+    reason = `${result.failure} twice; held for refund so no reviewer sees unchecked screenshots`;
+  } else if ("missing" in result) {
+    status = "needs_reupload";
+    reason = `${result.missing}; asked the customer to upload again`;
+  } else if (read!.explicit_content || read!.appears_under_18) {
+    status = "held";
+    reason = `Held for refund: ${read!.hold_reason || (read!.explicit_content ? "explicit content" : "person looks under 18")}`;
+  } else if (!read!.is_dating_profile) {
+    status = "needs_reupload";
+    reason = `Not a dating profile (${read!.hold_reason || "no profile found"}); asked the customer to upload again`;
+  } else {
+    status = "paid";
+    reason = "Screenshots are a dating profile with nothing explicit; sent to reviewers";
+  }
   const { data, error } = await db
     .from("orders")
-    .update(
-      passed
-        ? { status: "paid", first_read_json: read }
-        : { status: "held", first_read_json: read, hold_reason: reason },
-    )
+    .update({ status, first_read_json: read, hold_reason: status === "paid" ? null : reason })
     .eq("id", orderId)
     .eq("status", "screening")
     .select("id");
   if (error) console.error("first read update failed", orderId, error);
   if (!data?.length) return;
-  await logDecision(orderId, "first_read", passed ? "passed" : "held", reason);
-  if (passed) await notifyOrderPaid(orderId);
+  await logDecision(orderId, "first_read", status === "paid" ? "passed" : status, reason);
+  if (status === "paid") await notifyOrderPaid(orderId);
 }

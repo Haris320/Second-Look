@@ -18,6 +18,7 @@ import { audienceLabel } from "@/lib/audience";
 import { TIERS, type Tier } from "@/lib/tiers";
 import type { FirstRead } from "@/lib/first-read";
 import { ReportContent, type ProfileReport } from "./report-content";
+import { ReuploadForm } from "./reupload-form";
 type OrderData = {
   order: {
     id: string;
@@ -117,6 +118,7 @@ export function OrderStatus({ id }: { id: string }) {
   const paid = order.status !== "pending_payment";
   const done = order.status === "done";
   const held = order.status === "held";
+  const reupload = order.status === "needs_reupload";
   const firstRead = order.first_read_json;
   const savedCount = screenshots.filter((s) => s.url).length;
   const allSaved = screenshots.length > 0 && savedCount === screenshots.length;
@@ -186,12 +188,15 @@ export function OrderStatus({ id }: { id: string }) {
           <p>
             {done
               ? "Every perspective comes from an independent human reviewer."
-              : held
-                ? "We need a closer look at your screenshots before they go to reviewers. They should show your own dating profile, with nothing explicit. If we can’t go ahead, we’ll refund you."
-                : paid
-                ? "Every perspective comes from an independent human reviewer. Your results arrive by tonight."
-                : "You haven’t been charged. Review your details before heading to Whop."}
+              : reupload
+                ? "These screenshots don’t look like a dating profile, so we haven’t sent them to reviewers. Upload screenshots of your profile’s photos and prompts, and we’ll check them again right away."
+                : held
+                  ? "We need a closer look at your screenshots before they go to reviewers. They should show your own dating profile, with nothing explicit. If we can’t go ahead, we’ll refund you."
+                  : paid
+                    ? "Every perspective comes from an independent human reviewer. Your results arrive by tonight."
+                    : "You haven’t been charged. Review your details before heading to Whop."}
           </p>
+          {reupload && <ReuploadForm id={id} onDone={() => void load()} />}
           <ol className="status-timeline">
             {[
               {

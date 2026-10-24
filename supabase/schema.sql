@@ -13,9 +13,10 @@ create table orders (
   review_target   int  not null,
   reviews_done    int  not null default 0,
   -- awaiting_upload: paid on the Whop marketplace (Flow B), screenshots not uploaded yet
-  -- screening: paid, AI first read running; held: failed the first read (not a dating profile, explicit, or check failed)
+  -- screening: paid, AI first read running; needs_reupload: not a dating profile or screenshots missing, customer re-uploads;
+  -- held: explicit, looks under 18, or the check errored twice (refund)
   status          text not null default 'pending_payment'
-                  check (status in ('pending_payment', 'awaiting_upload', 'screening', 'held', 'paid', 'in_review', 'done')),
+                  check (status in ('pending_payment', 'awaiting_upload', 'screening', 'needs_reupload', 'held', 'paid', 'in_review', 'done')),
   whop_checkout_id text,
   whop_payment_id text unique,
   amount_cents    int,
