@@ -365,8 +365,9 @@ export function UploadForm() {
             )}
             <div className="form-bottom">
               <span>
-                <LockKeyhole size={14} /> Your profile stays private.
-                Screenshots are deleted after your report is delivered.
+                <LockKeyhole size={14} /> Your profile stays private. AI
+                checks your screenshots first, and they’re deleted after your
+                report is delivered.
               </span>
               <button
                 className="button button-coral"

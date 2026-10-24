@@ -179,7 +179,7 @@ export default function Home() {
             ],
             [
               "Where does AI come in?",
-              "People do the reviewing. AI may help summarize their feedback and suggest prompt rewrites. Those suggestions are labeled separately.",
+              "People do the reviewing. Right after you pay, AI gives you an instant first read and checks your screenshots are a dating profile with nothing explicit before any reviewer sees them. AI also helps summarize the human feedback and suggest prompt rewrites. Anything AI-written is labeled.",
             ],
             [
               "Will this get me more matches?",

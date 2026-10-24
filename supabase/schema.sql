@@ -13,12 +13,15 @@ create table orders (
   review_target   int  not null,
   reviews_done    int  not null default 0,
   -- awaiting_upload: paid on the Whop marketplace (Flow B), screenshots not uploaded yet
+  -- screening: paid, AI first read running; held: failed the first read (not a dating profile, explicit, or check failed)
   status          text not null default 'pending_payment'
-                  check (status in ('pending_payment', 'awaiting_upload', 'paid', 'in_review', 'done')),
+                  check (status in ('pending_payment', 'awaiting_upload', 'screening', 'held', 'paid', 'in_review', 'done')),
   whop_checkout_id text,
   whop_payment_id text unique,
   amount_cents    int,
   report_json     jsonb,
+  first_read_json jsonb,                               -- AI first read; shown labeled as AI, never part of report_json
+  hold_reason     text,                                -- why the first read held the order (team only)
   created_at      timestamptz not null default now(),
   paid_at         timestamptz,
   delivered_at    timestamptz

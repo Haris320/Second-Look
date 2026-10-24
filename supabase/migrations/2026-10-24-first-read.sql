@@ -1,0 +1,5 @@
+-- AI first read: two new order statuses and two columns. Run once in Supabase → SQL Editor.
+alter table orders drop constraint orders_status_check;
+alter table orders add constraint orders_status_check
+  check (status in ('pending_payment', 'awaiting_upload', 'screening', 'held', 'paid', 'in_review', 'done'));
+alter table orders add column first_read_json jsonb, add column hold_reason text;

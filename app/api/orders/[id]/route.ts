@@ -17,7 +17,7 @@ export async function GET(
   const { data, error } = await db
     .from("orders")
     .select(
-      "id,audience,tier,amount_cents,review_target,reviews_done,status,report_json,created_at",
+      "id,audience,tier,amount_cents,review_target,reviews_done,status,report_json,first_read_json,created_at",
     )
     .eq("id", id)
     .single();
@@ -26,6 +26,8 @@ export async function GET(
       { error: "Order not found." },
       { status: 404, headers: privateHeaders },
     );
+  // A held order's first read describes why it was held; that stays on the team dashboard.
+  if (data.status === "held") data.first_read_json = null;
   const { data: screenshots } = await db
     .from("screenshots")
     .select("id,storage_path,position")

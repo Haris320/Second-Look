@@ -4,9 +4,12 @@ import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
 import { whop, whopWebhookSecret, toCents } from "@/lib/whop";
 import { TIERS, tierForAmount } from "@/lib/tiers";
-import { notifyOrderPaid } from "@/lib/orders";
+import { runFirstRead } from "@/lib/first-read";
 
 type WhopEvent = { type?: string; action?: string; data?: { id?: string } };
+
+// The AI first read runs inside after(), so give the function time for one Claude call.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const payload = await request.text();
@@ -37,15 +40,16 @@ export async function POST(request: Request) {
 
   if (orderId) {
     // Flow A: the order already exists with screenshots. The status guard makes webhook retries no-ops.
+    // It waits in 'screening' until the AI first read moves it to 'paid' (sent to reviewers) or 'held'.
     const { data } = await db
       .from("orders")
-      .update({ status: "paid", whop_payment_id: payment.id, amount_cents: amountCents, paid_at: new Date().toISOString() })
+      .update({ status: "screening", whop_payment_id: payment.id, amount_cents: amountCents, paid_at: new Date().toISOString() })
       .eq("id", orderId)
       .eq("status", "pending_payment")
       .select("id");
     if (data?.length) {
       await logDecision(orderId, "payment", "paid", `Whop payment ${payment.id} confirmed`);
-      after(() => notifyOrderPaid(orderId));
+      after(() => runFirstRead(orderId));
     }
     return new Response("ok");
   }

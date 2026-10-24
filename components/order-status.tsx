@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { audienceLabel } from "@/lib/audience";
 import { TIERS, type Tier } from "@/lib/tiers";
+import type { FirstRead } from "@/lib/first-read";
 import { ReportContent, type ProfileReport } from "./report-content";
 type OrderData = {
   order: {
@@ -27,6 +28,7 @@ type OrderData = {
     reviews_done: number;
     status: string;
     report_json: ProfileReport | null;
+    first_read_json: FirstRead | null;
   };
   screenshots: { id: string; position: number; url: string | null }[];
   checkoutReady: boolean;
@@ -114,6 +116,8 @@ export function OrderStatus({ id }: { id: string }) {
   const { order, screenshots } = data;
   const paid = order.status !== "pending_payment";
   const done = order.status === "done";
+  const held = order.status === "held";
+  const firstRead = order.first_read_json;
   const savedCount = screenshots.filter((s) => s.url).length;
   const allSaved = screenshots.length > 0 && savedCount === screenshots.length;
   return (
@@ -182,7 +186,9 @@ export function OrderStatus({ id }: { id: string }) {
           <p>
             {done
               ? "Every perspective comes from an independent human reviewer."
-              : paid
+              : held
+                ? "We need a closer look at your screenshots before they go to reviewers. They should show your own dating profile, with nothing explicit. If we can’t go ahead, we’ll refund you."
+                : paid
                 ? "Every perspective comes from an independent human reviewer. Your results arrive by tonight."
                 : "You haven’t been charged. Review your details before heading to Whop."}
           </p>
@@ -342,6 +348,39 @@ export function OrderStatus({ id }: { id: string }) {
           <p className="caption">Order {order.id.slice(0, 8)}</p>
         </aside>
       </div>
+      {paid && !done && firstRead && (
+        <section className="dashboard-section">
+          <div className="report-grid">
+            <article className="report-card wide">
+              <span className="eyebrow">AI FIRST READ · NOT FROM A HUMAN REVIEWER</span>
+              <h2>While your reviewers get to work.</h2>
+              <p>{firstRead.first_impression}</p>
+              {firstRead.lead_photo > 0 && (
+                <p>Lead with screenshot {firstRead.lead_photo}.</p>
+              )}
+              {!!firstRead.working.length && (
+                <ul>
+                  {firstRead.working.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+              )}
+              <ol className="fix-list">
+                {firstRead.tips.map((tip, i) => (
+                  <li key={tip}>
+                    <b>0{i + 1}</b>
+                    <p>{tip}</p>
+                  </li>
+                ))}
+              </ol>
+              <p className="caption">
+                Written by AI from your screenshots before any person saw them.
+                Your report from real reviewers replaces this.
+              </p>
+            </article>
+          </div>
+        </section>
+      )}
       {done && order.report_json && (
         <section className="dashboard-section">
           <ReportContent report={order.report_json} />
