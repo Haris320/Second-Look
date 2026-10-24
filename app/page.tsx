@@ -27,7 +27,7 @@ export default function Home() {
             </Link>
           </div>
           <p className="editorial-small">
-            $15 for one reviewer · $40 for three
+            $15 for one reviewer · $40 for three · Results by tonight
           </p>
         </div>
         <aside className="review-note">

@@ -136,6 +136,7 @@ export function OrderStatus({ id }: { id: string }) {
   const allSaved = screenshots.length > 0 && savedCount === screenshots.length;
   return (
     <>
+      {data.privateLink && <PrivateLink link={data.privateLink} />}
       <div className="page-heading">
         <div>
           <p className="eyebrow">YOUR SECOND LOOK</p>
@@ -179,7 +180,6 @@ export function OrderStatus({ id }: { id: string }) {
           {error}
         </div>
       )}
-      {data.privateLink && <PrivateLink link={data.privateLink} />}
       <div className="status-layout">
         <div className="panel">
           <div className="status-icon">
