@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "terac:tools": "node --env-file=.env.local scripts/terac-tools.mjs",
+    "terac:claude": "node --env-file=.env.local scripts/terac-tools.mjs --claude"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"
