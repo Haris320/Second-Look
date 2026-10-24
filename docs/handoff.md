@@ -50,11 +50,10 @@ Context for an agent picking this up. No secret values appear here; keys live on
 
 - **Customer flow (live):** upload up to 10 screenshots to the private bucket → order `pending_payment` → `POST /api/orders/[id]/checkout` → `createCheckout()` makes a **production** $15 one-time Whop checkout with `metadata.order_id` and a redirect to `/order/[id]`.
   - Checkout creation was verified in production by creating and then deleting one.
-- **Webhook** `app/api/whop/webhook/route.ts` (live; `WHOP_WEBHOOK_SECRET` set; unsigned requests get 401):
+- **Webhook** `app/api/whop/webhook/route.ts` (live; `WHOP_WEBHOOK_SECRET` set; unsigned requests get 401; **proven with a real payment**):
   - Verifies with `unwrapWebhook` (`@whop/sdk/helpers`), reads only the event name and `data.id`, then re-fetches the payment with `whop.payments.retrieve` and checks `status === "paid"`.
   - With `metadata.order_id`: marks the order `paid`, stores `whop_payment_id`, `amount_cents` and `paid_at`, logs a decision, and inside `after()` calls `notifyOrderPaid()` → `POST /api/agent/order-paid` with `Bearer $CRON_SECRET`. That route doesn't exist yet, so it gets a 404, which is fine.
   - Without an order ID (a marketplace purchase): creates an `awaiting_upload` order if the amount is $15.
-  - **Not yet tested with a real payment.**
 - **`setSalesOpen(open)` / `isSalesOpen()`** in `lib/whop.ts`: hide or show Whop products (tagged `metadata.sales_paused`); `createCheckout` throws "Sales are paused" while any product is tagged. Tested in sandbox.
 - **Terac spike script** `scripts/terac-tools.mjs` (`npm run terac:tools`, `npm run terac:claude`): lists the MCP tools into `docs/terac-tools.json` and calls `terac_get_context`. It's wired correctly (Terac returns 401 to a dummy key) but **hasn't run with a real key**.
 
@@ -104,18 +103,32 @@ Context for an agent picking this up. No secret values appear here; keys live on
 
 ## Where things stand right now
 
-- **Haris is placing a real $15 test order** through https://second-look-beta.vercel.app/order (the version with the old age-range form). Check whether it arrived: query `orders` for `status in (paid, in_review, done)` with the supabase MCP.
-- **Once it's `paid`:**
-  1. show Haris the order row and its `decisions` rows;
-  2. Haris refunds it himself in the Whop dashboard; never refund it yourself;
-  3. delete the test order, its storage files (paths in `screenshots.storage_path`) and its decision rows so the demo log starts clean.
-- **Expected:** the order stops at "paid, 0 of 3", because no Terac or agent code exists yet.
-- **Pushes were held during the test** so a redeploy couldn't break it. The two-audience change and this handoff are committed and pushed once the test payment lands. If `git log origin/main` doesn't show "Replace custom reviewer age ranges with two fixed audiences", the push hasn't happened yet: run `git push`.
+- **The real $15 payment test passed** (2026-10-24, 15:57–15:58 UTC). Upload → production Whop checkout → real payment → signed webhook → payment re-fetched → order marked `paid` → decisions logged. The webhook marked it paid within about a second.
+- **The test order is still in the database on purpose. The refund is on hold; Haris will refund later.**
+
+  | Field | Value |
+  |---|---|
+  | Order | `b5a2985e-fbb6-4dd6-bcbb-4e4412a9a749` |
+  | Status | `paid` |
+  | Amount | 1500 cents |
+  | Whop payment | `pay_J1xEzBcJINCx6i` |
+  | Whop checkout | `ch_bdmcCQ9nLPmWGb9` |
+  | Reviews | 0 of 3 |
+  | Audience | `men_18_31_us` (made by the old age-range form; not a valid audience any more) |
+  | Screenshots | 1 file in bucket `screenshots`, path in `screenshots.storage_path` for that order |
+  | Decisions | 2 rows: `order/created`, `payment/paid` |
+
+- **This test order must not reach Terac reviewers.**
+  - Its audience matches no panel, so panel matching shouldn't pick it up.
+  - When the partner's agent starts processing `paid` orders, make sure it skips this order, or clean it up first.
+  - The order counts toward any revenue the dashboard shows until it's removed.
+- **When Haris says the refund is done:** delete the order's storage file, then its `screenshots` rows, then its `decisions` rows, then the order itself. Ask Haris to confirm before deleting. Never refund anything yourself.
+- **Everything is pushed**; the last commits on `main` are the two-audience change and this handoff. The live site has the two-audience form.
 
 ## Next action items
 
 **Haris (Whop and customer side)**
-1. Run the real $15 test and refund it (above).
+1. ~~Run the real $15 test~~ (passed). Later: refund `pay_J1xEzBcJINCx6i` in the Whop dashboard, then have the agent delete the test order (above).
 2. **Whop dashboard:**
    - confirm payouts and verification are finished so live payments settle (ask Whop staff);
    - set the store name and URL name, logo, banner and support email.
