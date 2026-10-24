@@ -1,8 +1,10 @@
+import { after } from "next/server";
 import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
 import { whop, whopWebhookSecret, toCents } from "@/lib/whop";
 import { TIERS, tierForAmount } from "@/lib/tiers";
+import { notifyOrderPaid } from "@/lib/orders";
 
 type WhopEvent = { type?: string; action?: string; data?: { id?: string } };
 
@@ -41,7 +43,10 @@ export async function POST(request: Request) {
       .eq("id", orderId)
       .eq("status", "pending_payment")
       .select("id");
-    if (data?.length) await logDecision(orderId, "payment", "paid", `Whop payment ${payment.id} confirmed`);
+    if (data?.length) {
+      await logDecision(orderId, "payment", "paid", `Whop payment ${payment.id} confirmed`);
+      after(() => notifyOrderPaid(orderId));
+    }
     return new Response("ok");
   }
 

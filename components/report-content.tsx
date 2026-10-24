@@ -7,9 +7,83 @@ export type ProfileReport = {
   prompt_feedback?: string;
   prompt_rewrites?: string[];
 };
-export function ReportContent({ report }: { report: ProfileReport }) {
+export type AgentReport = {
+  version: number;
+  review_count: number;
+  like: { yes: number; maybe: number; no: number };
+  come_across?: { word: string; count: number }[];
+  top_fixes?: { fix: string; mentions: number }[];
+  prompts?: { works?: { summary: string }; falls_flat?: { summary: string } };
+  ai_rewrites?: { prompt: string; rewrite: string }[];
+  photos?: {
+    position: number;
+    avg_score: number;
+    best_votes: number;
+    worst_votes: number;
+  }[];
+  lead_photo?: number;
+  cut_photo?: number;
+};
+export function ReportContent({
+  report: input,
+}: {
+  report: ProfileReport | AgentReport;
+}) {
+  const agent = "version" in input ? input : null;
+  const report: ProfileReport = agent
+    ? {
+        review_count: agent.review_count,
+        like_count: agent.like?.yes,
+        words: agent.come_across?.map((item) => item.word),
+        top_fixes: agent.top_fixes?.map((item) => ({
+          title: item.fix,
+          description: `${item.mentions} reviewer${item.mentions === 1 ? "" : "s"} mentioned this.`,
+        })),
+        prompt_feedback: [
+          agent.prompts?.works?.summary,
+          agent.prompts?.falls_flat?.summary,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        prompt_rewrites: agent.ai_rewrites?.map((item) => item.rewrite),
+      }
+    : (input as ProfileReport);
   return (
     <div className="report-grid">
+      {!!agent?.photos?.length && (
+        <article className="report-card wide">
+          <span className="eyebrow">YOUR PHOTOS</span>
+          <h2>What your reviewers noticed.</h2>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>PHOTO</th>
+                  <th>AVERAGE SCORE</th>
+                  <th>BEST PHOTO VOTES</th>
+                  <th>SUGGESTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agent.photos.map((photo) => (
+                  <tr key={photo.position}>
+                    <td>Photo {photo.position}</td>
+                    <td>{photo.avg_score.toFixed(1)} / 10</td>
+                    <td>{photo.best_votes}</td>
+                    <td>
+                      {photo.position === agent.lead_photo
+                        ? "Lead with this"
+                        : photo.position === agent.cut_photo
+                          ? "Consider replacing"
+                          : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      )}
       {report.summary && (
         <article className="report-card wide">
           <span className="eyebrow">THE BIG PICTURE</span>

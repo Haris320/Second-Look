@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/supabase";
+import { logDecision } from "@/lib/log";
 import { AUDIENCES, validateFiles, type UploadManifest } from "@/lib/uploads";
 import { REVIEW_OFFER } from "@/lib/tiers";
 import { grantAccess, sameOrigin, privateHeaders } from "@/lib/order-access";
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
   const rows = (files as UploadManifest[]).map((file, position) => ({
     id: randomUUID(),
     order_id: id,
-    position,
+    position: position + 1,
     storage_path: `${id}/${randomUUID()}.${file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : "webp"}`,
   }));
   try {
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
       if (signError || !data) throw signError;
       uploads.push({ path: row.storage_path, token: data.token });
     }
+    await logDecision(id, "order", "created", "Standard $15 order with 3 reviewers; awaiting payment");
     await grantAccess(id);
     return Response.json(
       { orderId: id, uploads, storageUrl: process.env.SUPABASE_URL },

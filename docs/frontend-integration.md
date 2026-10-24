@@ -34,13 +34,13 @@ Mutating routes check the request Origin. A persistent five-drafts-per-email-per
 
 The implementation uses the existing five tables without a migration. Table RLS remains enabled, and storage remains private. Do not grant anonymous table access or make the bucket public to integrate the frontend.
 
-Screenshots live in `screenshots/<order UUID>/<random UUID>.<extension>`. Screenshot rows store a zero-based `position`. The `orders` row is `pending_payment` until the Whop webhook confirms payment.
+Screenshots live in `screenshots/<order UUID>/<random UUID>.<extension>`. Screenshot rows store a one-based `position`. The `orders` row is `pending_payment` until the Whop webhook confirms payment.
 
 `ORDER_SESSION_SECRET` is an optional independent HMAC secret. If absent, the server uses `SUPABASE_SERVICE_KEY` to sign order cookies. Rotating the signing secret invalidates existing sessions.
 
 ## Report rendering
 
-The result view reads `orders.report_json` after `status=done`. Agree on this schema with the report generator:
+The result view reads `orders.report_json` after `status=done`. The renderer accepts the team’s version-1 agent report documented in `checklist.md`, including photo scores, prompt feedback, and AI rewrites. It also supports this simpler shape for the illustrative example:
 
 ```ts
 type ProfileReport = {
@@ -54,7 +54,7 @@ type ProfileReport = {
 };
 ```
 
-Only actual report data is shown on real order pages. `/example` is explicitly illustrative. Photo ranking and richer reviewer quotes can be added when the report API contract is finalized.
+Only actual report data is shown on real order pages. `/example` is explicitly illustrative. Version-1 photo rankings are rendered from the agent’s values.
 
 ## Reviewer and marketplace handoffs
 
@@ -69,3 +69,7 @@ Import the repository with the Next.js preset and repository root as the root di
 Set `PUBLIC_BASE_URL` to the final HTTPS origin. Add `DASHBOARD_PASSWORD` and optionally `ORDER_SESSION_SECRET`. Add Whop environment settings when ready, then configure its webhook at `/api/whop/webhook` and validate sandbox payment behavior before live use. The frontend itself needs no Vercel cron.
 
 The paid service is commercial usage; verify the hosting plan is eligible under Vercel's terms. No Vercel project or paid plan was provisioned by this change.
+
+## Merge compatibility
+
+The payment webhook retains the team’s `notifyOrderPaid` hook, and Whop checkout retains `isSalesOpen`/`setSalesOpen`. Superseded upload/finalize endpoints return 410; verified marketplace claiming remains unavailable rather than exposing paid orders using an email alone. Screenshot positions are one-based to match the agent handoff contract.

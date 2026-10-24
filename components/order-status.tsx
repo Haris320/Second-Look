@@ -241,7 +241,7 @@ export function OrderStatus({ id }: { id: string }) {
                       width={62}
                       height={85}
                       unoptimized
-                      alt={`Saved screenshot ${s.position + 1}`}
+                      alt={`Saved screenshot ${s.position}`}
                     />
                   ) : null,
                 )}

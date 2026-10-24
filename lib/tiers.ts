@@ -10,3 +10,6 @@ export type Tier = keyof typeof TIERS;
 export function tierForAmount(usd: number): Tier | null {
   return usd === REVIEW_OFFER.priceUsd ? "quick" : null;
 }
+
+// Shared with the agent and older integrations; canonical audience values live in uploads.ts.
+export { AUDIENCES, type Audience } from "./uploads";
