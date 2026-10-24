@@ -23,6 +23,7 @@ create table orders (
   report_json     jsonb,
   first_read_json jsonb,                               -- AI first read; shown labeled as AI, never part of report_json
   hold_reason     text,                                -- why the first read held the order (team only)
+  access_key_hash text,                                -- SHA-256 of the private order link's key (lib/order-links.ts)
   created_at      timestamptz not null default now(),
   paid_at         timestamptz,
   delivered_at    timestamptz

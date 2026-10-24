@@ -19,6 +19,7 @@ import { TIERS, type Tier } from "@/lib/tiers";
 import type { FirstRead } from "@/lib/first-read";
 import { ReportContent, type ProfileReport } from "./report-content";
 import { ReuploadForm } from "./reupload-form";
+import { PrivateLink } from "./private-link";
 type OrderData = {
   order: {
     id: string;
@@ -33,6 +34,7 @@ type OrderData = {
   };
   screenshots: { id: string; position: number; url: string | null }[];
   checkoutReady: boolean;
+  privateLink: string | null;
 };
 export function OrderStatus({ id }: { id: string }) {
   const [data, setData] = useState<OrderData | null>(null);
@@ -53,13 +55,23 @@ export function OrderStatus({ id }: { id: string }) {
   }, [id]);
   // Fetch completion updates state asynchronously; this effect subscribes to external data.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
+    // A private link (?key=…) first gives this browser access, then the key leaves the address bar.
+    const key = new URLSearchParams(window.location.search).get("key");
+    const opening = key
+      ? fetch(`/api/orders/${id}/open`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key }),
+        })
+          .then(() => window.history.replaceState(null, "", `/order/${id}`))
+          .catch(() => {})
+      : Promise.resolve();
+    void opening.then(load);
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void load();
     }, 30000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [id, load]);
   async function checkout() {
     setBusy(true);
     setError("");
@@ -167,6 +179,7 @@ export function OrderStatus({ id }: { id: string }) {
           {error}
         </div>
       )}
+      {data.privateLink && <PrivateLink link={data.privateLink} />}
       <div className="status-layout">
         <div className="panel">
           <div className="status-icon">

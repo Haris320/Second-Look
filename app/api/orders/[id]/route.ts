@@ -1,5 +1,6 @@
 import { db } from "@/lib/supabase";
 import { hasAccess, privateHeaders, sameOrigin } from "@/lib/order-access";
+import { currentOrderLink } from "@/lib/order-links";
 
 export async function GET(
   _request: Request,
@@ -10,14 +11,14 @@ export async function GET(
     return Response.json(
       {
         error:
-          "Open this order in the browser you used to upload your profile.",
+          "Open this order from its private link, or in the browser you used to upload your profile.",
       },
       { status: 403, headers: privateHeaders },
     );
   const { data, error } = await db
     .from("orders")
     .select(
-      "id,audience,tier,amount_cents,review_target,reviews_done,status,report_json,first_read_json,created_at",
+      "id,audience,tier,amount_cents,review_target,reviews_done,status,report_json,first_read_json,access_key_hash,created_at",
     )
     .eq("id", id)
     .single();
@@ -28,6 +29,8 @@ export async function GET(
     );
   // A held or rejected first read describes why; that stays on the team dashboard.
   if (data.status === "held" || data.status === "needs_reupload") data.first_read_json = null;
+  const { access_key_hash, ...order } = data;
+  const privateLink = await currentOrderLink(id, access_key_hash);
   const { data: screenshots } = await db
     .from("screenshots")
     .select("id,storage_path,position")
@@ -49,7 +52,7 @@ export async function GET(
       process.env.PUBLIC_BASE_URL,
   );
   return Response.json(
-    { order: data, screenshots: images, checkoutReady },
+    { order, screenshots: images, checkoutReady, privateLink },
     { headers: privateHeaders },
   );
 }
