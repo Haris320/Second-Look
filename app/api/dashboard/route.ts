@@ -3,13 +3,14 @@ import { dashboardAccess } from "@/lib/dashboard-access";
 import { kickReconcile } from "@/lib/reconcile-kick";
 import { db } from "@/lib/supabase";
 import { privateHeaders } from "@/lib/order-access";
+import { loadInsights } from "@/lib/marketing";
 export async function GET() {
   if (!(await dashboardAccess()))
     return Response.json(
       { error: "Sign in to view the team dashboard." },
       { status: 401, headers: privateHeaders },
     );
-  const [orders, decisions, tests] = await Promise.all([
+  const [orders, decisions, tests, marketing] = await Promise.all([
     db
       .from("orders")
       .select(
@@ -25,6 +26,7 @@ export async function GET() {
       .limit(60),
     // Team test purchases are marked with a logged manual decision, so revenue and counts exclude them.
     db.from("decisions").select("order_id").eq("step", "manual").eq("choice", "test_order"),
+    loadInsights().catch(() => null),
   ]);
   if (orders.error || decisions.error || tests.error)
     return Response.json(
@@ -38,6 +40,7 @@ export async function GET() {
     {
       orders: (orders.data ?? []).map((o) => ({ ...o, is_test: testIds.has(o.id) })),
       decisions: decisions.data,
+      marketing,
     },
     { headers: privateHeaders },
   );

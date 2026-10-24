@@ -7,6 +7,7 @@ import { processFeedback, processFeedbackEvent } from "./feedback-quality";
 import { FEEDBACK_POLICY_VERSION } from "./feedback-policy";
 import { deliverReportIfComplete, deleteScreenshots } from "./report";
 import { logDecision } from "./log";
+import { publishInsightsIfDue } from "./marketing";
 
 // Safety net for every stall path, called every few minutes by a laptop loop or external pinger
 // (POST /api/agent/reconcile, Bearer CRON_SECRET). Terac webhooks are the fast path; this is the
@@ -25,7 +26,7 @@ type Attention = { orderId: string | null; step: string; choice: string; reason:
 type Submission = { id: string; status: string; participant_id?: string };
 type Summary = {
   recruited: unknown[]; feedback: unknown[]; events: unknown[]; reports: unknown[]; freed: string[]; deleted: string[];
-  attention: Attention[]; errors: string[]; balanceDollars: number | null; ms: number;
+  attention: Attention[]; errors: string[]; balanceDollars: number | null; marketing: string | null; ms: number;
 };
 
 function message(e: unknown) { return (e instanceof Error ? e.message : String(e)).slice(0, 200); }
@@ -74,7 +75,7 @@ function listItems<T>(page: unknown): T[] {
 
 export async function reconcile(): Promise<Summary> {
   const started = Date.now();
-  const s: Summary = { recruited: [], feedback: [], events: [], reports: [], freed: [], deleted: [], attention: [], errors: [], balanceDollars: null, ms: 0 };
+  const s: Summary = { recruited: [], feedback: [], events: [], reports: [], freed: [], deleted: [], attention: [], errors: [], balanceDollars: null, marketing: null, ms: 0 };
 
   // Attention rows are logged at most once an hour per order/step/choice so a short loop can't flood the log.
   async function flag(a: Attention) {
@@ -231,6 +232,14 @@ export async function reconcile(): Promise<Summary> {
     }
   } catch (e) {
     s.errors.push(`credits: ${message(e)}`);
+  }
+
+  // 8. Marketing: republish the public /insights post from aggregate review patterns when enough new reviews are in.
+  try {
+    const m = await publishInsightsIfDue();
+    s.marketing = `${m.state}${m.detail ? `: ${m.detail}` : ""}`;
+  } catch (e) {
+    s.errors.push(`marketing: ${message(e)}`);
   }
 
   s.ms = Date.now() - started;

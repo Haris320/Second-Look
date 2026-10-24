@@ -22,6 +22,14 @@ type Data = {
     reason: string;
     created_at: string;
   }[];
+  marketing: {
+    title: string;
+    share_post: string;
+    review_count: number;
+    like_rate: number;
+    published_at: string;
+    patterns: { heading: string }[];
+  } | null;
 };
 export function Dashboard() {
   const [data, setData] = useState<Data | null>(null);
@@ -163,6 +171,30 @@ export function Dashboard() {
           </article>
         ))}
       </div>
+      <section className="panel dashboard-section">
+        <h2>Marketing (autonomous)</h2>
+        {data.marketing ? (
+          <>
+            <p>
+              The agent published <a href="/insights" target="_blank" rel="noreferrer">/insights</a>{" "}
+              <b>“{data.marketing.title}”</b> from {data.marketing.review_count} approved reviews
+              {" · "}{Math.round(data.marketing.like_rate * 100)}% like rate
+              {" · "}updated {new Date(data.marketing.published_at).toLocaleString()}.
+              It republishes itself after every {3} new approved reviews, at most hourly, and logs each run below.
+            </p>
+            <p className="caption" style={{ marginTop: 8 }}>
+              Patterns: {data.marketing.patterns.map((p) => p.heading).join(" · ")}
+            </p>
+            <p className="caption" style={{ marginTop: 8 }}>
+              Draft share post: “{data.marketing.share_post}”
+            </p>
+          </>
+        ) : (
+          <p className="caption">
+            Nothing published yet. The agent writes a public insights post once at least 3 reviews are approved.
+          </p>
+        )}
+      </section>
       <section className="panel">
         <h2>Orders</h2>
         <div className="table-wrap">

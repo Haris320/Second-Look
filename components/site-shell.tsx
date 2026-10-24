@@ -13,6 +13,7 @@ export function Header() {
         <Link href="/#how-it-works">How it works</Link>
         <Link href="/example">Example review</Link>
         <Link href="/#pricing">Pricing</Link>
+        <Link href="/insights">Insights</Link>
         <Link href="/refer">Refer & earn $3</Link>
       </nav>
       <Link className="button button-dark header-cta" href="/order">
@@ -34,6 +35,7 @@ export function Footer() {
         <span>Reviewed by people.</span>
         <span>Independent of Hinge, Bumble, and Tinder.</span>
         <div>
+          <Link href="/insights">Insights</Link>
           <Link href="/refer">Refer & earn $3</Link>
           <Link href="/review">Reviewer portal</Link>
           <Link href="/dashboard">Team dashboard</Link>
