@@ -4,6 +4,30 @@ import { kickReconcile } from "@/lib/reconcile-kick";
 import { db } from "@/lib/supabase";
 import { hasAccess, privateHeaders, sameOrigin } from "@/lib/order-access";
 import { currentOrderLink, tooManyResponse, tooManyWrongKeys } from "@/lib/order-links";
+import { parseReviewAnswers } from "@/lib/reviewer-access";
+
+// Approved human reviews for an order still in progress, in the order they came in. Each one maps to
+// a real Terac submission; the finished report carries them in report_json instead.
+async function approvedReviews(orderId: string, status: string, limit: number) {
+  if (!["paid", "in_review"].includes(status)) return [];
+  const { data } = await db
+    .from("reviews")
+    .select("answers_json")
+    .eq("order_id", orderId)
+    .eq("status", "approved")
+    .order("submitted_at")
+    .limit(limit);
+  const reviews: { like: string; works: string; changes: string; prompts: string }[] = [];
+  for (const row of data ?? []) {
+    try {
+      const a = parseReviewAnswers(row.answers_json);
+      reviews.push({ like: a.like, works: a.works, changes: a.changes, prompts: a.prompts });
+    } catch {
+      // An approved review that no longer parses is left out here; the report build reports it.
+    }
+  }
+  return reviews;
+}
 
 export async function GET(
   request: Request,
@@ -58,11 +82,14 @@ export async function GET(
       : process.env.WHOP_API_KEY && process.env.WHOP_BIZ_ID) &&
       process.env.PUBLIC_BASE_URL,
   );
-  const referral = await referralSummary(id);
+  const [referral, reviews] = await Promise.all([
+    referralSummary(id),
+    approvedReviews(id, order.status, order.review_target),
+  ]);
   // A customer waiting on their order page keeps the agent's reconcile clock ticking (deduplicated server-side).
   if (["paid", "in_review"].includes(order.status)) after(() => kickReconcile("order_poll"));
   return Response.json(
-    { order, screenshots: images, checkoutReady, privateLink, referral },
+    { order, screenshots: images, checkoutReady, privateLink, referral, reviews },
     { headers: privateHeaders },
   );
 }

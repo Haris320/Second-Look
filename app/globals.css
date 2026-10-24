@@ -1555,6 +1555,56 @@ textarea::placeholder {
 .report-card.wide {
   grid-column: 1/-1;
 }
+/* In-progress order page: human reviews and the AI first read must read as two different things. */
+.report-card.human-card {
+  background: var(--sage);
+  border: 1px solid #c9d4bd;
+  border-left: 5px solid var(--coral);
+}
+.report-card.human-card .eyebrow {
+  color: var(--coral-dark);
+}
+.human-review {
+  margin-top: 22px;
+  padding: 18px 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.human-review h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.human-review p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin-top: 8px;
+}
+.human-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--coral);
+  color: white;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.report-card.ai-card {
+  background: #f4f3ee;
+  border: 1px dashed #c6c9bd;
+}
+.report-card.ai-card h2,
+.report-card.ai-card p,
+.report-card.ai-card li {
+  color: #5f665c;
+}
 .report-card h2 {
   font-size: 23px;
 }

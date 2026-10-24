@@ -39,11 +39,17 @@ async function recoverLostCreate(orderId: string, taskToken: string) {
   const { data: order, error } = await db.from("orders").select("status,audience,review_target").eq("id", orderId).single();
   if (error || !order || order.status !== "paid") throw new Error("Order is no longer waiting for recruitment");
   const input = opportunityInput(orderId, order.audience, projectId, baseUrl, taskToken, order.review_target);
+  const since = Date.now() - 24 * 3600_000;
   const late = await withTerac(async call => {
+    // The list omits internal_title, so read each recent draft/active opportunity and match on the full record.
     const page = await call<unknown>("terac_list_opportunities", { projectId, limit: 50 });
-    for (const item of listItems<{ id?: string; internal_title?: string; status?: string }>(page)) {
-      if (item?.internal_title !== input.internal_title || typeof item.id !== "string") continue;
-      const candidate = await call<Record<string, unknown>>("terac_get_opportunity", { opportunityId: item.id });
+    const items = listItems<{ id?: string; status?: string; created_at?: string }>(page)
+      .filter(item => typeof item?.id === "string" && ["draft", "active"].includes(item.status ?? "") && Date.parse(item.created_at ?? "") > since)
+      .sort((a, b) => Date.parse(b.created_at ?? "") - Date.parse(a.created_at ?? ""))
+      .slice(0, 12);
+    for (const item of items) {
+      const candidate = await call<Record<string, unknown>>("terac_get_opportunity", { opportunityId: item.id as string });
+      if (candidate?.internal_title !== input.internal_title) continue;
       try { assertOpportunityMatches(candidate, input); return candidate as { id: string; status: string }; } catch { /* a different draft for this order, e.g. an older token */ }
     }
     return null;

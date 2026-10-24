@@ -37,6 +37,13 @@ type OrderData = {
   checkoutReady: boolean;
   privateLink: string | null;
   referral: ReferralSummary | null;
+  reviews?: HumanReview[];
+};
+type HumanReview = { like: string; works: string; changes: string; prompts: string };
+const LIKE_LABELS: Record<string, string> = {
+  yes: "Would like this profile",
+  maybe: "Maybe",
+  no: "Would pass",
 };
 export function OrderStatus({ id }: { id: string }) {
   const [data, setData] = useState<OrderData | null>(null);
@@ -129,6 +136,7 @@ export function OrderStatus({ id }: { id: string }) {
       </div>
     );
   const { order, screenshots } = data;
+  const reviews = data.reviews ?? [];
   const paid = order.status !== "pending_payment";
   const done = order.status === "done";
   const held = order.status === "held";
@@ -331,12 +339,45 @@ export function OrderStatus({ id }: { id: string }) {
           <p className="caption">Order {order.id.slice(0, 8)}</p>
         </aside>
       </div>
+      {paid && !done && reviews.length > 0 && (
+        <section className="dashboard-section">
+          <div className="report-grid">
+            <article className="report-card wide human-card">
+              <span className="eyebrow">
+                FROM YOUR HUMAN REVIEWERS · {reviews.length} OF {order.review_target} IN
+              </span>
+              <h2>What real people have said so far.</h2>
+              <p>
+                Each review below was written by one person who looked at your profile. Your full
+                report, with the rest of your reviewers, arrives when all {order.review_target} are in.
+              </p>
+              {reviews.map((review, i) => (
+                <div className="human-review" key={i}>
+                  <h3>
+                    <span className="human-badge">Human reviewer {i + 1}</span>
+                    {LIKE_LABELS[review.like] ?? review.like}
+                  </h3>
+                  <p>
+                    <b>What works:</b> {review.works}
+                  </p>
+                  <p>
+                    <b>What to change:</b> {review.changes}
+                  </p>
+                  <p>
+                    <b>Bio and prompts:</b> {review.prompts}
+                  </p>
+                </div>
+              ))}
+            </article>
+          </div>
+        </section>
+      )}
       {paid && !done && firstRead && (
         <section className="dashboard-section">
           <div className="report-grid">
-            <article className="report-card wide">
+            <article className="report-card wide ai-card">
               <span className="eyebrow">AI FIRST READ · NOT FROM A HUMAN REVIEWER</span>
-              <h2>While your reviewers get to work.</h2>
+              <h2>{reviews.length > 0 ? "Before anyone saw it: the AI read." : "While your reviewers get to work."}</h2>
               <p>{firstRead.first_impression}</p>
               {firstRead.lead_photo > 0 && (
                 <p>Lead with screenshot {firstRead.lead_photo}.</p>
