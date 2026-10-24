@@ -11,5 +11,13 @@ export function tierForAmount(usd: number): Tier | null {
   return usd === REVIEW_OFFER.priceUsd ? "quick" : null;
 }
 
-// Shared with the agent and older integrations; canonical audience values live in uploads.ts.
-export { AUDIENCES, type Audience } from "./uploads";
+// The only reviewer audiences we sell. Each key must match a Terac panel (one always-open opportunity per audience).
+export const AUDIENCES = {
+  women_21_35_us: "Women, 21–35, US",
+  men_21_35_us: "Men, 21–35, US",
+} as const;
+export type Audience = keyof typeof AUDIENCES;
+
+export function isAudience(value: unknown): value is Audience {
+  return typeof value === "string" && value in AUDIENCES;
+}

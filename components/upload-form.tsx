@@ -20,13 +20,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { IMAGE_TYPES, MAX_SCREENSHOTS, validateFiles } from "@/lib/uploads";
-import {
-  recommendedAges,
-  validAge,
-  reviewerPreferenceError,
-  type ReviewerGender,
-} from "@/lib/audience";
-import { REVIEW_OFFER } from "@/lib/tiers";
+import { AUDIENCES, REVIEW_OFFER, type Audience } from "@/lib/tiers";
 type Shot = { id: string; file: File; url: string };
 type Prepared = {
   orderId: string;
@@ -48,17 +42,7 @@ export function UploadForm() {
   const [progress, setProgress] = useState(0);
   const [email, setEmail] = useState("");
   const [savedOrderId, setSavedOrderId] = useState<string | null>(null);
-  const [userAge, setUserAge] = useState("");
-  const [reviewerGender, setReviewerGender] = useState<ReviewerGender>("women");
-  const [reviewerMinAge, setReviewerMinAge] = useState("");
-  const [reviewerMaxAge, setReviewerMaxAge] = useState("");
-  function applyRecommendedAge(value: string) {
-    if (validAge(Number(value))) {
-      const range = recommendedAges(Number(value));
-      setReviewerMinAge(String(range.min));
-      setReviewerMaxAge(String(range.max));
-    }
-  }
+  const [audience, setAudience] = useState<Audience>("women_21_35_us");
   const [ownProfile, setOwn] = useState(false);
   const [adult, setAdult] = useState(false);
   const [zoom, setZoom] = useState<Shot | null>(null);
@@ -133,16 +117,6 @@ export function UploadForm() {
   }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const preferenceError = reviewerPreferenceError({
-      userAge: Number(userAge),
-      reviewerGender,
-      reviewerMinAge: Number(reviewerMinAge),
-      reviewerMaxAge: Number(reviewerMaxAge),
-    });
-    if (preferenceError) {
-      setError(preferenceError);
-      return;
-    }
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -154,10 +128,7 @@ export function UploadForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
-            userAge: Number(userAge),
-            reviewerGender,
-            reviewerMinAge: Number(reviewerMinAge),
-            reviewerMaxAge: Number(reviewerMaxAge),
+            audience,
             ownProfile,
             adult,
             files: shots.map((s) => ({
@@ -433,93 +404,25 @@ export function UploadForm() {
               <p className="field-help">
                 For updates about your review. No public profile is created.
               </p>
-              <label className="field-label" htmlFor="user-age">
-                Your age
-              </label>
-              <input
-                id="user-age"
-                type="number"
-                inputMode="numeric"
-                min={18}
-                max={120}
-                step={1}
-                required
-                placeholder="e.g. 28"
-                value={userAge}
-                onChange={(e) => {
-                  setUserAge(e.target.value);
-                  applyRecommendedAge(e.target.value);
-                }}
-                aria-describedby="age-help"
-              />
-              <p className="field-help" id="age-help">
-                We suggest reviewers within 7 years of your age. All reviewers
-                must be 18 or older.
-              </p>
-              <p className="field-help">
-                Who’s reviewing: real people recruited through Terac who match
-                the reviewers you choose here. Every review in your report comes
-                from one of them.
-              </p>
-              <label className="field-label" htmlFor="reviewer-gender">
-                Reviewer gender
+              <label className="field-label" htmlFor="audience">
+                Who should review your profile?
               </label>
               <select
-                id="reviewer-gender"
-                value={reviewerGender}
-                onChange={(e) =>
-                  setReviewerGender(e.target.value as ReviewerGender)
-                }
+                id="audience"
+                value={audience}
+                onChange={(e) => setAudience(e.target.value as Audience)}
               >
-                <option value="women">Female</option>
-                <option value="men">Male</option>
+                {(Object.keys(AUDIENCES) as Audience[]).map((key) => (
+                  <option key={key} value={key}>
+                    {AUDIENCES[key]}
+                  </option>
+                ))}
               </select>
-              <div className="reviewer-age-fields">
-                <div>
-                  <label className="field-label" htmlFor="reviewer-min-age">
-                    Minimum reviewer age
-                  </label>
-                  <input
-                    id="reviewer-min-age"
-                    type="number"
-                    inputMode="numeric"
-                    min={18}
-                    max={reviewerMaxAge || 120}
-                    step={1}
-                    required
-                    value={reviewerMinAge}
-                    onChange={(e) => setReviewerMinAge(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="reviewer-max-age">
-                    Maximum reviewer age
-                  </label>
-                  <input
-                    id="reviewer-max-age"
-                    type="number"
-                    inputMode="numeric"
-                    min={reviewerMinAge || 18}
-                    max={120}
-                    step={1}
-                    required
-                    value={reviewerMaxAge}
-                    onChange={(e) => setReviewerMaxAge(e.target.value)}
-                  />
-                </div>
-              </div>
               <p className="field-help">
-                Adjust these if you prefer. Reviewers are based in the United
-                States.
+                Who’s reviewing: real people aged 21–35 in the US, recruited
+                through Terac. Every review in your report comes from one of
+                them.
               </p>
-              <button
-                type="button"
-                className="text-link age-reset"
-                disabled={!validAge(Number(userAge))}
-                onClick={() => applyRecommendedAge(userAge)}
-              >
-                Use recommended ages
-              </button>
               <div className="standard-offer">
                 <strong>3 independent reviewers</strong>
                 <span>$15, one time</span>

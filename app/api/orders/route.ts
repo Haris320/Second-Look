@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
 import { validateFiles, type UploadManifest } from "@/lib/uploads";
-import { reviewerPreferenceError } from "@/lib/audience";
-import { REVIEW_OFFER } from "@/lib/tiers";
+import { REVIEW_OFFER, isAudience } from "@/lib/tiers";
 import { grantAccess, sameOrigin, privateHeaders } from "@/lib/order-access";
 
 export async function POST(request: Request) {
@@ -22,25 +21,12 @@ export async function POST(request: Request) {
   }
   if (!body || typeof body !== "object" || Array.isArray(body))
     return Response.json({ error: "Invalid request." }, { status: 400 });
-  const {
-    email,
-    userAge,
-    reviewerGender,
-    reviewerMinAge,
-    reviewerMaxAge,
-    ownProfile,
-    adult,
-    files,
-  } = body;
-  const preferenceError = reviewerPreferenceError({
-    userAge,
-    reviewerGender,
-    reviewerMinAge,
-    reviewerMaxAge,
-  });
-  if (preferenceError)
-    return Response.json({ error: preferenceError }, { status: 400 });
-  const audience = `${reviewerGender}_${reviewerMinAge}_${reviewerMaxAge}_us`;
+  const { email, audience, ownProfile, adult, files } = body;
+  if (!isAudience(audience))
+    return Response.json(
+      { error: "Choose who should review your profile." },
+      { status: 400 },
+    );
   const error = validateFiles(files);
   if (error) return Response.json({ error }, { status: 400 });
   if (

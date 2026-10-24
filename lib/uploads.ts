@@ -1,11 +1,6 @@
 export const MAX_SCREENSHOTS = 10;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-export const AUDIENCES = {
-  women_21_35_us: "Women, 21–35 · United States",
-  men_21_35_us: "Men, 21–35 · United States",
-} as const;
-export type Audience = keyof typeof AUDIENCES;
 export type UploadManifest = { name: string; type: string; size: number };
 export function validateFiles(files: UploadManifest[]): string | null {
   if (
