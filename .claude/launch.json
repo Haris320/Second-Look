@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev-sandbox",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["WHOP_ENVIRONMENT=sandbox", "npx", "next", "dev", "-p", "3100"],
+      "port": 3100
+    }
+  ]
+}

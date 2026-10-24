@@ -4,22 +4,9 @@ import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
 import { whop, whopWebhookSecret, toCents } from "@/lib/whop";
 import { TIERS, tierForAmount } from "@/lib/tiers";
+import { notifyOrderPaid } from "@/lib/orders";
 
 type WhopEvent = { type?: string; action?: string; data?: { id?: string } };
-
-// Hands a paid order to the agent (partner's app/api/agent/order-paid → onOrderPaid). Runs after Whop
-// gets its 200. A 404 means the agent side isn't deployed yet, which is fine: its tick picks the order up.
-async function notifyOrderPaid(orderId: string) {
-  const res = await fetch(`${process.env.PUBLIC_BASE_URL}/api/agent/order-paid`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CRON_SECRET}` },
-    body: JSON.stringify({ orderId }),
-  }).catch((err) => {
-    console.error("order-paid hook failed", err);
-    return null;
-  });
-  if (res && !res.ok && res.status !== 404) console.error("order-paid hook returned", res.status);
-}
 
 export async function POST(request: Request) {
   const payload = await request.text();
