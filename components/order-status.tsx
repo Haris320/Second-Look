@@ -19,6 +19,7 @@ import { TIERS, expectedOrderCents, type Tier } from "@/lib/tiers";
 import type { FirstRead } from "@/lib/first-read";
 import { ReportContent, type ProfileReport } from "./report-content";
 import { ReuploadForm } from "./reupload-form";
+import { ReferralPanel, type ReferralSummary } from "./referral-panel";
 import { PrivateLink } from "./private-link";
 type OrderData = {
   order: {
@@ -35,6 +36,7 @@ type OrderData = {
   screenshots: { id: string; position: number; url: string | null }[];
   checkoutReady: boolean;
   privateLink: string | null;
+  referral: ReferralSummary | null;
 };
 export function OrderStatus({ id }: { id: string }) {
   const [data, setData] = useState<OrderData | null>(null);
@@ -180,6 +182,7 @@ export function OrderStatus({ id }: { id: string }) {
         </div>
       )}
       {data.privateLink && <PrivateLink link={data.privateLink} />}
+      {data.referral && <ReferralPanel referral={data.referral} />}
       <div className="status-layout">
         <div className="panel">
           <div className="status-icon">

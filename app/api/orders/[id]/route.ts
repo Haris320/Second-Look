@@ -1,3 +1,4 @@
+import { referralSummary } from "@/lib/referrals";
 import { db } from "@/lib/supabase";
 import { hasAccess, privateHeaders, sameOrigin } from "@/lib/order-access";
 import { currentOrderLink } from "@/lib/order-links";
@@ -51,8 +52,9 @@ export async function GET(
       : process.env.WHOP_API_KEY && process.env.WHOP_BIZ_ID) &&
       process.env.PUBLIC_BASE_URL,
   );
+  const referral = await referralSummary(id);
   return Response.json(
-    { order, screenshots: images, checkoutReady, privateLink },
+    { order, screenshots: images, checkoutReady, privateLink, referral },
     { headers: privateHeaders },
   );
 }

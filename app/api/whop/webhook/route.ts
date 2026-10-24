@@ -1,8 +1,10 @@
+import { recordReferralPurchase } from "@/lib/referrals";
+import { handleReferralEvent } from "@/lib/referral-payouts";
 import { after } from "next/server";
 import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
-import { whop, whopWebhookSecret, toCents } from "@/lib/whop";
+import { whop, whopWebhookSecret, whopBizId, toCents } from "@/lib/whop";
 import { TIERS, tierForAmount, expectedOrderCents } from "@/lib/tiers";
 import { runFirstRead } from "@/lib/first-read";
 
@@ -27,9 +29,11 @@ export async function POST(request: Request) {
   // Only the event name and payment ID come from the payload; everything else is re-fetched from Whop.
   const eventName = event.type ?? event.action;
   const paymentId = event.data?.id;
+  if (eventName && paymentId && await handleReferralEvent(eventName,paymentId)) return new Response("ok");
   if (eventName !== "payment.succeeded" || !paymentId) return new Response("ignored");
 
   const payment = await whop.payments.retrieve({ id: paymentId });
+  if (payment.account_id !== whopBizId) return new Response("Wrong payment account", {status:403});
   if (payment.status !== "paid") {
     await logDecision(null, "payment", "ignored", `Payment ${paymentId} reported succeeded but status is ${payment.status}`);
     return new Response("not paid");
@@ -59,6 +63,7 @@ export async function POST(request: Request) {
       await logDecision(orderId, "payment", "paid", `Whop payment ${payment.id} confirmed`);
       after(() => runFirstRead(orderId));
     }
+    await recordReferralPurchase(payment,orderId);
     return new Response("ok");
   }
 
@@ -86,5 +91,8 @@ export async function POST(request: Request) {
   if (data?.length) {
     await logDecision(data[0].id, "payment", "awaiting_upload", `Marketplace payment ${payment.id}; waiting for the buyer's screenshots`);
   }
+  const {data: paidOrder, error: lookupError} = await db.from("orders").select("id").eq("whop_payment_id",payment.id).single();
+  if(lookupError || !paidOrder) return new Response("Order unavailable",{status:503});
+  await recordReferralPurchase(payment,paidOrder.id);
   return new Response("ok");
 }

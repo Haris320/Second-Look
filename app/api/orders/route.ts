@@ -1,3 +1,4 @@
+import { attributedReferrer, referralsEnabled } from "@/lib/referrals";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/supabase";
 import { logDecision } from "@/lib/log";
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
       tier,
       review_target: TIERS[tier].reviews,
       status: "pending_payment",
+      ...(referralsEnabled() ? { referral_profile_id: await attributedReferrer() } : {}),
     });
     if (orderError) throw orderError;
     const { error: rowsError } = await db.from("screenshots").insert(rows);
