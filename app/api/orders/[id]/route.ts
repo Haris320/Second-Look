@@ -1,14 +1,17 @@
 import { referralSummary } from "@/lib/referrals";
 import { db } from "@/lib/supabase";
 import { hasAccess, privateHeaders, sameOrigin } from "@/lib/order-access";
-import { currentOrderLink } from "@/lib/order-links";
+import { currentOrderLink, tooManyResponse, tooManyWrongKeys } from "@/lib/order-links";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  if (!(await hasAccess(id)))
+  if (!(await hasAccess(id))) {
+    // An address locked out for wrong link keys is locked out here too. A 403 here isn't counted: this page
+    // polls, and an expired cookie shouldn't lock its owner out of their own link.
+    if (await tooManyWrongKeys(request)) return tooManyResponse();
     return Response.json(
       {
         error:
@@ -16,6 +19,7 @@ export async function GET(
       },
       { status: 403, headers: privateHeaders },
     );
+  }
   const { data, error } = await db
     .from("orders")
     .select(

@@ -41,7 +41,9 @@ Every paid order runs through these steps with no one on the team touching it. E
 | 6 | Reviewer submits; answers saved; redirect to the Terac callback | Partner | Partner (mock mode) |
 | 7 | **Quality check:** Claude approves (Terac pays the reviewer) or rejects (no pay; the order gets another reviewer) each submission; `reviews_done` counts approved only [`review/approved`, `review/rejected`] | Partner | Partner (mock mode) |
 | 8 | **Credits:** after each approval, check the Terac balance. If it runs low, log an alert so Haris tops up; no automatic sales pause. `setSalesOpen` is an emergency switch only [`credits/low`] | Partner logs the alert; Haris tops up | Partner (mock mode) |
+| 2b | **"Payment received" Whop message:** thanks, private link, results by tonight, results also arrive here. Sent from the webhook alongside the first read, through a Whop support chat as the business [`notify/paid_sent` or `notify/paid_failed`] | Haris | Live |
 | 9 | **Report:** at `review_target`, Claude builds `report_json` from approved reviews only (AI rewrites labeled); status `done`, `delivered_at` set [`report/delivered`] | Partner writes it, Haris's page renders it | Page live; writer is partner's |
+| 9b | **"Results are in" Whop message:** right after the update that sets `status = 'done'` succeeds, call `await notifyResultsReady(orderId)` from `lib/notify.ts`. It never throws and logs its own row [`notify/results_sent` or `notify/results_failed`] | Partner adds the one call; Haris owns `lib/notify.ts` | Function live, call not wired |
 | 10 | **Delete screenshots:** storage files and `screenshots` rows, right after delivery [`privacy/deleted`] | Partner | Partner (mock mode) |
 | 11 | Held orders (explicit, under 18, or check errored twice): refund in the Whop dashboard. The agent never moves money, so this is the one human step | Haris (human) | Manual by design |
 

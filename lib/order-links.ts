@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "./supabase";
 import { grantAccess, validId } from "./order-access";
+import { logDecision } from "./log";
 
 // Private order links: /order/[id]?key=… opens the order from any browser. A key is an HMAC of the order ID
 // under ORDER_LINK_SECRET, so the server can rebuild any order's link (to message the buyer). Orders from before
@@ -73,3 +74,33 @@ export async function openWithKey(id: string, key: unknown) {
   await rememberKey(id, key);
   return true;
 }
+
+// Wrong keys or forged access cookies: each one is logged, and 10 from one address in 15 minutes gets a 429.
+// Addresses are stored only as a salted hash. (The 256-bit keys can't be guessed anyway; this keeps it obvious.)
+const WRONG_KEY_LIMIT = 10;
+function clientTag(request: Request) {
+  const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+  return createHmac("sha256", process.env.ORDER_LINK_SECRET ?? "").update(ip).digest("hex").slice(0, 12);
+}
+
+export async function tooManyWrongKeys(request: Request) {
+  const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const { count } = await db
+    .from("decisions")
+    .select("id", { count: "exact", head: true })
+    .eq("step", "access")
+    .eq("choice", "wrong_key")
+    .like("reason", `%client ${clientTag(request)}%`)
+    .gt("created_at", since);
+  return (count ?? 0) >= WRONG_KEY_LIMIT;
+}
+
+export async function recordWrongKey(request: Request, id: string, what: string) {
+  await logDecision(null, "access", "wrong_key", `${what} refused for order ${id.slice(0, 8)} from client ${clientTag(request)}`);
+}
+
+export const tooManyResponse = () =>
+  Response.json(
+    { error: "Too many attempts. Please wait 15 minutes and try again." },
+    { status: 429, headers: { "Cache-Control": "private, no-store", "Retry-After": "900" } },
+  );
