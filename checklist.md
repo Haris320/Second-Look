@@ -1,5 +1,7 @@
 # checklist.md: Second Look build order
 
+> Pricing update (2026-10-24): one standard $15 review with 3 reviewers and up to 10 screenshots. This supersedes tiered pricing and review counts below. New orders retain the `quick` database value only for schema compatibility.
+
 Turns `plan.md` into steps. **A** = backend/agent, **B** = frontend/sales, **You** = a human-only task (accounts, keys, asking staff).
 Each step has a **Check** that proves it works. Don't start the next step on the same track until its check passes.
 

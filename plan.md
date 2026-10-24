@@ -1,5 +1,7 @@
 # plan.md: Second Look build and sales plan
 
+> Pricing update (2026-10-24): one standard $15 review with 3 reviewers and up to 10 screenshots. This supersedes tiered pricing and review counts below. New orders retain the `quick` database value only for schema compatibility.
+
 Companion to `CLAUDE.md`. About 6 hours, two people. Selling starts as soon as one real order works, not at the end.
 
 ## Who does what

@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Second Look
 
-## Getting Started
+Real people review your dating profile. One standard review costs $15 and includes 3 independent reviewers. Built with React, TypeScript, Next.js App Router, and private Supabase Storage.
 
-First, run the development server:
+## Run locally
+
+Use Node.js 22.13+ or a current supported LTS version.
 
 ```bash
+npm ci
+cp .env.example .env.local  # Only for a new checkout; do not overwrite existing credentials.
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Required upload settings:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY` — server secret or legacy service-role key; never exposed to the browser
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — browser-safe key
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The existing database schema is in `supabase/schema.sql`. Do not rerun it against an already configured project. Storage requires a private `screenshots` bucket with a 10 MB file limit and support for PNG, JPEG, and WebP.
 
-## Learn More
+## What works
 
-To learn more about Next.js, take a look at the following resources:
+- Responsive landing page, pricing, FAQ, and clearly labeled illustrative report.
+- `/order`: select or drop 1–10 screenshots; preview, reorder, and remove them; select audience; enter email and adult/profile-owner consent.
+- Uploads go directly to private Supabase Storage using server-issued upload tokens. The server writes `orders` and `screenshots` rows and verifies actual image bytes before checkout.
+- `/order/[id]`: protected order status, screenshots, payment handoff, and deletion of an unpaid draft without an active checkout. Access uses an HttpOnly cookie in the browser that created the order.
+- `/dashboard`: password-protected live data for the latest 100 orders and 25 decisions. Set `DASHBOARD_PASSWORD` to enable sign-in.
+- `/review`: interactive UI preview only; live assignment and submission integration belongs to the Terac backend.
+- `/start`: a truthful placeholder until verified Whop purchase claiming is implemented. It does not unlock purchases by email alone.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Integration status
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Whop checkout uses the existing `lib/whop.ts` helper when the selected environment's API key, business ID, and `PUBLIC_BASE_URL` are set. The existing `/api/whop/webhook` remains unchanged. Live payments have not been exercised by the frontend upload tests.
 
-## Deploy on Vercel
+Terac assignment, review processing, report generation, email notification, and automatic screenshot deletion after delivery are not implemented by this frontend change. The site does not claim these operations have completed. Keep live sales closed until fulfillment is verified end to end.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See `docs/frontend-integration.md` for route contracts and deployment details.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Checks
+
+```bash
+npm run lint
+npm run build
+```
+
+The upload integration was also exercised against Supabase with 10 synthetic images, invalid file/count requests, session isolation, private object access, and cleanup of all test objects and orders. Browser visual verification was unavailable because local browser access was declined.

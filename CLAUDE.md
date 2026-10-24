@@ -1,5 +1,7 @@
 # CLAUDE.md: Second Look
 
+> Pricing update (2026-10-24): one standard $15 review with 3 reviewers and up to 10 screenshots. This supersedes tiered pricing and review counts below. New orders retain the `quick` database value only for schema compatibility.
+
 Working name: **Second Look**. Real people review your dating profile and tell you what's working, what isn't, and what to change. Results in about an hour.
 
 - **Event:** Zero-Human Company Hackathon by Terac, Whop HQ, Brooklyn. Two-person team, about 6 hours left.
