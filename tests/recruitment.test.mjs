@@ -54,7 +54,8 @@ test('eligible order creates and launches via MCP exactly once across duplicate 
 });
 test('ambiguous draft creation is blocked instead of creating a duplicate',async()=>{
  reset();state.failCreate=true;await assert.rejects(recruitOrder('order'));assert.equal(state.job.state,'needs_attention');
- await recruitOrder('order');assert.deepEqual(state.calls,['terac_create_opportunity']);
+ // A failed create looks for a late draft (list) before giving up, and never creates a second opportunity.
+ await recruitOrder('order');assert.deepEqual(state.calls,['terac_create_opportunity','terac_list_opportunities']);
 });
 test('lost launch response reconciles the same active opportunity without spending twice',async()=>{
  reset();state.loseLaunchResponse=true;await assert.rejects(recruitOrder('order'));assert.equal(state.job.state,'retryable');

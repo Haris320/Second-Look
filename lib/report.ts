@@ -80,7 +80,7 @@ export async function deliverReportIfComplete(orderId: string) {
   }
 }
 
-async function deleteScreenshots(orderId: string) {
+export async function deleteScreenshots(orderId: string) {
   const { data: shots } = await db.from("screenshots").select("storage_path").eq("order_id", orderId);
   const paths = (shots ?? []).map(s => s.storage_path);
   if (paths.length) {
