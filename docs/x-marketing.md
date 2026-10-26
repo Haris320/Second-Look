@@ -1,5 +1,7 @@
 # Daily X marketing
 
+Scheduling disabled on October 26, 2026 at the owner's request. The X cron entry was removed from `vercel.json`; the desktop automation was deleted. The code remains available, but re-enabling automatic posting requires explicitly restoring a schedule and configuring the publishing flags.
+
 The Vercel cron at 16:00 UTC runs once per day (Hobby scheduling can vary within the hour). It drafts useful original copy with Claude, checks claims in a second call, verifies @secondlook_date through X, and posts a tracked product link. No DMs, replies, paid ads, customer images or private order data are used. This first version records posts and adds UTM attribution; it does not yet join purchases to campaigns or automatically optimize based on conversions.
 
 ## Setup
