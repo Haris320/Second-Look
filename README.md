@@ -1,3 +1,5 @@
+*Won 2nd place at https://www.eventbrite.com/e/zero-human-company-hackathon-by-terac-whop-nyc-tickets-2002980886751*
+
 # Second Look
 
 Real people review your dating profile and tell you what's working, what isn't, and what to change. Built for the Zero-Human Company hackathon (Terac, at Whop HQ): no one on the team touches an order.
